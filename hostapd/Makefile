@@ -1,6 +1,4 @@
-ifndef CC
-CC=gcc
-endif
+CC=$(CROSS_COMPILE)gcc
 
 ifndef CFLAGS
 CFLAGS = -MMD -O2 -Wall -g
@@ -8,6 +6,7 @@ endif
 
 CFLAGS += -I../src
 CFLAGS += -I../src/utils
+CFLAGS += -I$(LIBNL_PATH)/include -I$(OPENSSL_PATH)/include
 
 # Uncomment following line and set the path to your kernel tree include
 # directory if your C library does not include all header files.
@@ -430,15 +429,15 @@ endif
 ifeq ($(CONFIG_TLS), openssl)
 ifdef TLS_FUNCS
 OBJS += ../src/crypto/tls_openssl.o
-LIBS += -lssl
+LIBS += $(OPENSSL_PATH)/libssl.a
 endif
 OBJS += ../src/crypto/crypto_openssl.o
 HOBJS += ../src/crypto/crypto_openssl.o
 ifdef NEED_FIPS186_2_PRF
 OBJS += ../src/crypto/fips_prf_openssl.o
 endif
-LIBS += -lcrypto
-LIBS_h += -lcrypto
+LIBS += $(OPENSSL_PATH)/libcrypto.a
+LIBS_h += $(OPENSSL_PATH)/libcrypto.a
 endif
 
 ifeq ($(CONFIG_TLS), gnutls)
@@ -810,7 +809,7 @@ NOBJS += ../src/utils/trace.o
 LIBS_n += -lbfd
 endif
 ifdef TLS_FUNCS
-LIBS_n += -lcrypto
+LIBS_n += $(OPENSSL_PATH)/libcrypto.a
 endif
 
 HOBJS += hlr_auc_gw.o ../src/utils/common.o ../src/utils/wpa_debug.o ../src/utils/os_$(CONFIG_OS).o ../src/utils/wpabuf.o ../src/crypto/milenage.o

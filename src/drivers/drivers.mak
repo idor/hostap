@@ -47,11 +47,11 @@ NEED_RFKILL=y
 ifdef CONFIG_LIBNL_TINY
 DRV_LIBS += -lnl-tiny
 else
-DRV_LIBS += -lnl
+DRV_LIBS += $(LIBNL_PATH)/lib/.libs/libnl.a -lm
 endif
 
 ifdef CONFIG_LIBNL20
-DRV_LIBS += -lnl-genl
+DRV_LIBS += $(LIBNL_PATH)/lib/.libs/libnl-genl.a
 DRV_CFLAGS += -DCONFIG_LIBNL20
 endif
 endif
