@@ -152,7 +152,7 @@ struct wpa_driver_nl80211_data {
 	u8 ssid[32];
 	size_t ssid_len;
 	int nlmode;
-	int ap_scan_as_station;
+	enum nl80211_iftype ap_scan_as_station;
 	unsigned int assoc_freq;
 
 	int monitor_sock;
@@ -186,7 +186,8 @@ struct wpa_driver_nl80211_data {
 
 static void wpa_driver_nl80211_scan_timeout(void *eloop_ctx,
 					    void *timeout_ctx);
-static int wpa_driver_nl80211_set_mode(void *priv, int mode);
+static int wpa_driver_nl80211_set_mode(void *priv,
+				       enum nl80211_iftype nlmode);
 static int
 wpa_driver_nl80211_finish_drv_init(struct wpa_driver_nl80211_data *drv);
 static int wpa_driver_nl80211_mlme(struct wpa_driver_nl80211_data *drv,
@@ -1156,6 +1157,17 @@ static int get_link_signal(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static int is_ap_interface(enum nl80211_iftype nlmode)
+{
+	return (nlmode == NL80211_IFTYPE_AP ||
+		nlmode == NL80211_IFTYPE_P2P_GO);
+}
+
+static int is_sta_interface(enum nl80211_iftype nlmode)
+{
+	return (nlmode == NL80211_IFTYPE_STATION ||
+		nlmode == NL80211_IFTYPE_P2P_CLIENT);
+}
 
 static int nl80211_get_link_signal(struct wpa_driver_nl80211_data *drv,
 				   struct wpa_signal_info *sig)
@@ -1374,12 +1386,12 @@ static int process_event(struct nl_msg *msg, void *arg)
 		}
 	}
 
-	if (drv->ap_scan_as_station &&
+	if ((drv->ap_scan_as_station != NL80211_IFTYPE_UNSPECIFIED) &&
 	    (gnlh->cmd == NL80211_CMD_NEW_SCAN_RESULTS ||
 	     gnlh->cmd == NL80211_CMD_SCAN_ABORTED)) {
 		wpa_driver_nl80211_set_mode(&drv->first_bss,
-					    IEEE80211_MODE_AP);
-		drv->ap_scan_as_station = 0;
+					    drv->ap_scan_as_station);
+		drv->ap_scan_as_station = NL80211_IFTYPE_UNSPECIFIED;
 	}
 
 	switch (gnlh->cmd) {
@@ -1890,6 +1902,7 @@ static void * wpa_driver_nl80211_init(void *ctx, const char *ifname,
 	drv->monitor_ifidx = -1;
 	drv->monitor_sock = -1;
 	drv->ioctl_sock = -1;
+	drv->ap_scan_as_station = NL80211_IFTYPE_UNSPECIFIED;
 
 	if (wpa_driver_nl80211_init_nl(drv)) {
 		os_free(drv);
@@ -2057,7 +2070,7 @@ wpa_driver_nl80211_finish_drv_init(struct wpa_driver_nl80211_data *drv)
 	drv->first_bss.ifindex = drv->ifindex;
 
 #ifndef HOSTAPD
-	if (wpa_driver_nl80211_set_mode(bss, IEEE80211_MODE_INFRA) < 0) {
+	if (wpa_driver_nl80211_set_mode(bss, NL80211_IFTYPE_STATION) < 0) {
 		wpa_printf(MSG_DEBUG, "nl80211: Could not configure driver to "
 			   "use managed mode");
 	}
@@ -2153,7 +2166,7 @@ static void wpa_driver_nl80211_deinit(void *priv)
 
 	nl80211_remove_monitor_interface(drv);
 
-	if (drv->nlmode == NL80211_IFTYPE_AP)
+	if (is_ap_interface(drv->nlmode))
 		wpa_driver_nl80211_del_beacon(drv);
 
 #ifdef HOSTAPD
@@ -2184,7 +2197,7 @@ static void wpa_driver_nl80211_deinit(void *priv)
 	eloop_cancel_timeout(wpa_driver_nl80211_scan_timeout, drv, drv->ctx);
 
 	(void) linux_set_iface_flags(drv->ioctl_sock, bss->ifname, 0);
-	wpa_driver_nl80211_set_mode(bss, IEEE80211_MODE_INFRA);
+	wpa_driver_nl80211_set_mode(bss, NL80211_IFTYPE_STATION);
 
 	if (drv->ioctl_sock >= 0)
 		close(drv->ioctl_sock);
@@ -2217,10 +2230,10 @@ static void wpa_driver_nl80211_deinit(void *priv)
 static void wpa_driver_nl80211_scan_timeout(void *eloop_ctx, void *timeout_ctx)
 {
 	struct wpa_driver_nl80211_data *drv = eloop_ctx;
-	if (drv->ap_scan_as_station) {
+	if (drv->ap_scan_as_station != NL80211_IFTYPE_UNSPECIFIED) {
 		wpa_driver_nl80211_set_mode(&drv->first_bss,
-					    IEEE80211_MODE_AP);
-		drv->ap_scan_as_station = 0;
+					    drv->ap_scan_as_station);
+		drv->ap_scan_as_station = NL80211_IFTYPE_UNSPECIFIED;
 	}
 	wpa_printf(MSG_DEBUG, "Scan timeout - try to get results");
 	wpa_supplicant_event(timeout_ctx, EVENT_SCAN_RESULTS, NULL);
@@ -2294,23 +2307,23 @@ static int wpa_driver_nl80211_scan(void *priv,
 		wpa_printf(MSG_DEBUG, "nl80211: Scan trigger failed: ret=%d "
 			   "(%s)", ret, strerror(-ret));
 #ifdef HOSTAPD
-		if (drv->nlmode == NL80211_IFTYPE_AP) {
+		if (is_ap_interface(drv->nlmode)) {
 			/*
 			 * mac80211 does not allow scan requests in AP mode, so
 			 * try to do this in station mode.
 			 */
 			if (wpa_driver_nl80211_set_mode(bss,
-							IEEE80211_MODE_INFRA))
+							NL80211_IFTYPE_STATION))
 				goto nla_put_failure;
 
 			if (wpa_driver_nl80211_scan(drv, params)) {
 				wpa_driver_nl80211_set_mode(bss,
-							    IEEE80211_MODE_AP);
+							    drv->nlmode);
 				goto nla_put_failure;
 			}
 
 			/* Restore AP mode when processing scan results */
-			drv->ap_scan_as_station = 1;
+			drv->ap_scan_as_station = drv->nlmode;
 			ret = 0;
 		} else
 			goto nla_put_failure;
@@ -2577,7 +2590,7 @@ static void wpa_driver_nl80211_check_bss_status(
 				   "indicates BSS status with " MACSTR
 				   " as authenticated",
 				   MAC2STR(r->bssid));
-			if (drv->nlmode == NL80211_IFTYPE_STATION &&
+			if (is_sta_interface(drv->nlmode) &&
 			    os_memcmp(r->bssid, drv->bssid, ETH_ALEN) != 0 &&
 			    os_memcmp(r->bssid, drv->auth_bssid, ETH_ALEN) !=
 			    0) {
@@ -2595,13 +2608,13 @@ static void wpa_driver_nl80211_check_bss_status(
 				   "indicate BSS status with " MACSTR
 				   " as associated",
 				   MAC2STR(r->bssid));
-			if (drv->nlmode == NL80211_IFTYPE_STATION &&
+			if (is_sta_interface(drv->nlmode) &&
 			    !drv->associated) {
 				wpa_printf(MSG_DEBUG, "nl80211: Local state "
 					   "(not associated) does not match "
 					   "with BSS state");
 				clear_state_mismatch(drv, r->bssid);
-			} else if (drv->nlmode == NL80211_IFTYPE_STATION &&
+			} else if (is_sta_interface(drv->nlmode) &&
 				   os_memcmp(drv->bssid, r->bssid, ETH_ALEN) !=
 				   0) {
 				wpa_printf(MSG_DEBUG, "nl80211: Local state "
@@ -2809,7 +2822,7 @@ static int wpa_driver_nl80211_set_key(const char *ifname, void *priv,
 	 */
 	if (ret || !set_tx || alg == WPA_ALG_NONE)
 		return ret;
-	if (drv->nlmode == NL80211_IFTYPE_AP && addr &&
+	if (is_ap_interface(drv->nlmode) && addr &&
 	    !is_broadcast_ether_addr(addr))
 		return ret;
 
@@ -3068,7 +3081,7 @@ static int wpa_driver_nl80211_authenticate(
 	os_memset(drv->auth_bssid, 0, ETH_ALEN);
 	/* FIX: IBSS mode */
 	if (drv->nlmode != NL80211_IFTYPE_STATION &&
-	    wpa_driver_nl80211_set_mode(priv, IEEE80211_MODE_INFRA) < 0)
+	    wpa_driver_nl80211_set_mode(priv, NL80211_IFTYPE_STATION) < 0)
 		return -1;
 
 retry:
@@ -3656,7 +3669,7 @@ static int wpa_driver_nl80211_send_mlme(void *priv, const u8 *data,
 	mgmt = (struct ieee80211_mgmt *) data;
 	fc = le_to_host16(mgmt->frame_control);
 
-	if (drv->nlmode == NL80211_IFTYPE_STATION &&
+	if (is_sta_interface(drv->nlmode) &&
 	    WLAN_FC_GET_TYPE(fc) == WLAN_FC_TYPE_MGMT &&
 	    WLAN_FC_GET_STYPE(fc) == WLAN_FC_STYPE_PROBE_RESP) {
 		/*
@@ -4465,7 +4478,9 @@ static int wpa_driver_nl80211_ap(struct wpa_driver_nl80211_data *drv,
 	if (params->p2p)
 		wpa_printf(MSG_DEBUG, "nl80211: Setup AP operations for P2P "
 			   "group (GO)");
-	if (wpa_driver_nl80211_set_mode(&drv->first_bss, params->mode) ||
+	enum nl80211_iftype nlmode = params->p2p ?
+		NL80211_IFTYPE_P2P_GO : NL80211_IFTYPE_AP;
+	if (wpa_driver_nl80211_set_mode(&drv->first_bss, nlmode) ||
 	    wpa_driver_nl80211_set_freq(drv, params->freq, 0, 0)) {
 		nl80211_remove_monitor_interface(drv);
 		return -1;
@@ -4516,7 +4531,8 @@ static int wpa_driver_nl80211_ibss(struct wpa_driver_nl80211_data *drv,
 
 	wpa_printf(MSG_DEBUG, "nl80211: Join IBSS (ifindex=%d)", drv->ifindex);
 
-	if (wpa_driver_nl80211_set_mode(&drv->first_bss, params->mode)) {
+	if (wpa_driver_nl80211_set_mode(&drv->first_bss,
+					NL80211_IFTYPE_ADHOC)) {
 		wpa_printf(MSG_INFO, "nl80211: Failed to set interface into "
 			   "IBSS mode");
 		return -1;
@@ -4757,7 +4773,10 @@ static int wpa_driver_nl80211_associate(
 		return wpa_driver_nl80211_ibss(drv, params);
 
 	if (!(drv->capa.flags & WPA_DRIVER_FLAGS_SME)) {
-		if (wpa_driver_nl80211_set_mode(priv, params->mode) < 0)
+		enum nl80211_iftype nlmode = params->p2p ?
+			NL80211_IFTYPE_P2P_CLIENT : NL80211_IFTYPE_STATION;
+
+		if (wpa_driver_nl80211_set_mode(priv, nlmode) < 0)
 			return -1;
 		return wpa_driver_nl80211_connect(drv, params);
 	}
@@ -4904,27 +4923,13 @@ nla_put_failure:
 }
 
 
-static int wpa_driver_nl80211_set_mode(void *priv, int mode)
+static int wpa_driver_nl80211_set_mode(void *priv,
+				       enum nl80211_iftype nlmode)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	int ret = -1;
-	int nlmode;
 	int i;
-
-	switch (mode) {
-	case 0:
-		nlmode = NL80211_IFTYPE_STATION;
-		break;
-	case 1:
-		nlmode = NL80211_IFTYPE_ADHOC;
-		break;
-	case 2:
-		nlmode = NL80211_IFTYPE_AP;
-		break;
-	default:
-		return -1;
-	}
 
 	if (nl80211_set_mode(drv, drv->ifindex, nlmode) == 0) {
 		drv->nlmode = nlmode;
@@ -4969,12 +4974,12 @@ static int wpa_driver_nl80211_set_mode(void *priv, int mode)
 	}
 
 done:
-	if (!ret && nlmode == NL80211_IFTYPE_AP) {
+	if (!ret && is_ap_interface(nlmode)) {
 		/* Setup additional AP mode functionality if needed */
 		if (drv->monitor_ifidx < 0 &&
 		    nl80211_create_monitor_interface(drv))
 			return -1;
-	} else if (!ret && nlmode != NL80211_IFTYPE_AP) {
+	} else if (!ret && !is_ap_interface(nlmode)) {
 		/* Remove additional AP mode functionality */
 		nl80211_remove_monitor_interface(drv);
 		bss->beacon_set = 0;
@@ -5739,7 +5744,7 @@ static void *i802_init(struct hostapd_data *hapd,
 			goto failed;
 	}
 
-	if (wpa_driver_nl80211_set_mode(bss, IEEE80211_MODE_AP)) {
+	if (wpa_driver_nl80211_set_mode(bss, drv->nlmode)) {
 		wpa_printf(MSG_ERROR, "nl80211: Failed to set interface %s "
 			   "into AP mode", bss->ifname);
 		goto failed;
@@ -6091,7 +6096,7 @@ static int wpa_driver_nl80211_send_action(void *priv, unsigned int freq,
 	os_memcpy(hdr->addr2, src, ETH_ALEN);
 	os_memcpy(hdr->addr3, bssid, ETH_ALEN);
 
-	if (drv->nlmode == NL80211_IFTYPE_AP)
+	if (is_ap_interface(drv->nlmode))
 		ret = wpa_driver_nl80211_send_mlme(priv, buf, 24 + data_len);
 	else
 		ret = nl80211_send_frame_cmd(drv, freq, wait_time, buf,
@@ -6210,7 +6215,7 @@ static int wpa_driver_nl80211_probe_req_report(void *priv, int report)
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 
-	if (drv->nlmode != NL80211_IFTYPE_STATION) {
+	if (!is_sta_interface(drv->nlmode)) {
 		wpa_printf(MSG_DEBUG, "nl80211: probe_req_report control only "
 			   "allowed in station mode (iftype=%d)",
 			   drv->nlmode);
@@ -6348,10 +6353,10 @@ static int wpa_driver_nl80211_deinit_ap(void *priv)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	if (drv->nlmode != NL80211_IFTYPE_AP)
+	if (!is_ap_interface(drv->nlmode))
 		return -1;
 	wpa_driver_nl80211_del_beacon(drv);
-	return wpa_driver_nl80211_set_mode(priv, IEEE80211_MODE_INFRA);
+	return wpa_driver_nl80211_set_mode(priv, NL80211_IFTYPE_STATION);
 }
 
 
