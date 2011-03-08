@@ -15,7 +15,7 @@
 
 #ifdef ANDROID
 #include <linux/if.h>
-#endif /* ANDROID */
+#endif
 
 #include "utils/includes.h"
 #include <sys/ioctl.h>
