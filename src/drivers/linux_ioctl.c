@@ -12,6 +12,11 @@
  * See README and COPYING for more details.
  */
 
+
+#ifdef ANDROID
+#include <linux/if.h>
+#endif
+
 #include "utils/includes.h"
 #include <sys/ioctl.h>
 #include <net/if.h>
