@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-WPA_BUILD_HOSTAPD := false
+WPA_BUILD_HOSTAPD := true
 ifneq ($(TARGET_SIMULATOR),true)
   ifneq ($(BOARD_HOSTAPD_DRIVER),)
     WPA_BUILD_HOSTAPD := true
@@ -8,7 +8,7 @@ ifneq ($(TARGET_SIMULATOR),true)
   endif
 endif
 
-include $(LOCAL_PATH)/.config
+include $(LOCAL_PATH)/config-android
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
@@ -30,7 +30,7 @@ INCLUDES += $(LOCAL_PATH)/src/utils
 INCLUDES += external/openssl/include
 INCLUDES += frameworks/base/cmds/keystore
 ifdef CONFIG_DRIVER_NL80211
-INCLUDES += external/libnl_2/include
+INCLUDES += external/libnl/include
 endif
 
 
@@ -796,7 +796,7 @@ include $(BUILD_EXECUTABLE)
 
 ########################
 include $(CLEAR_VARS)
-LOCAL_MODULE := hostapd
+LOCAL_MODULE := hostapd_bin
 LOCAL_MODULE_TAGS := optional
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
@@ -806,11 +806,14 @@ LOCAL_STATIC_LIBRARIES += $(BOARD_HOSTAPD_PRIVATE_LIB)
 endif
 LOCAL_SHARED_LIBRARIES := libc libcutils libcrypto libssl
 ifdef CONFIG_DRIVER_NL80211
-LOCAL_SHARED_LIBRARIES += libnl_2
+LOCAL_SHARED_LIBRARIES += libnl
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 include $(BUILD_EXECUTABLE)
+
+
+include $(LOCAL_PATH)/deconfig-android
 
 endif # ifeq ($(WPA_BUILD_HOSTAPD),true)
