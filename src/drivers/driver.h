@@ -602,6 +602,7 @@ struct hostapd_sta_add_params {
 	size_t supp_rates_len;
 	u16 listen_interval;
 	const struct ieee80211_ht_capabilities *ht_capabilities;
+	u32 flags;
 };
 
 struct hostapd_freq_params {
