@@ -609,6 +609,8 @@ struct hostapd_sta_add_params {
 	u16 listen_interval;
 	const struct ieee80211_ht_capabilities *ht_capabilities;
 	u32 flags;
+	u8 uapsd_queues;
+	u8 max_sp;
 };
 
 struct hostapd_freq_params {
