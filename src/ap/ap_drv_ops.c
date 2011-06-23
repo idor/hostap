@@ -318,7 +318,7 @@ int hostapd_sta_add(struct hostapd_data *hapd,
 		    const u8 *supp_rates, size_t supp_rates_len,
 		    u16 listen_interval,
 		    const struct ieee80211_ht_capabilities *ht_capab,
-		    u32 flags)
+		    u32 flags, u8 uapsd_queues, u8 max_sp)
 {
 	struct hostapd_sta_add_params params;
 
