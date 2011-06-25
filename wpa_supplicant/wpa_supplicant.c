@@ -52,6 +52,9 @@
 #include "bss.h"
 #include "scan.h"
 #include "offchannel.h"
+#ifdef ANDROID
+#include <cutils/properties.h>
+#endif /* ANDROID */
 
 const char *wpa_supplicant_version =
 "wpa_supplicant v" VERSION_STR "\n"
