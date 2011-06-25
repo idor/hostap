@@ -718,4 +718,13 @@ static inline void wpa_drv_set_rekey_info(struct wpa_supplicant *wpa_s,
 	wpa_s->driver->set_rekey_info(wpa_s->drv_priv, kek, kck, replay_ctr);
 }
 
+#ifdef ANDROID
+static inline int wpa_drv_driver_cmd(struct wpa_supplicant *wpa_s,
+					  char *cmd, char *buf, size_t buf_len)
+{
+	if (wpa_s->driver->driver_cmd)
+		return wpa_s->driver->driver_cmd(wpa_s->drv_priv, cmd, buf, buf_len);
+	return -1;
+}
+#endif /* ANDROID */
 #endif /* DRIVER_I_H */

@@ -41,6 +41,9 @@
 #include "radiotap_iter.h"
 #include "rfkill.h"
 #include "driver.h"
+#ifdef ANDROID
+#include "common/wpa_ctrl.h"
+#endif /* ANDROID */
 
 #ifdef CONFIG_LIBNL20
 /* libnl 2.0 compatibility code */
@@ -7419,4 +7422,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.remove_pmkid = nl80211_remove_pmkid,
 	.flush_pmkid = nl80211_flush_pmkid,
 	.set_rekey_info = nl80211_set_rekey_info,
+#ifdef ANDROID
+	.driver_cmd = nl80211_priv_driver_cmd,
+#endif /* ANDROID */
 };
