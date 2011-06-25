@@ -1368,7 +1368,7 @@ ifeq ($(WPA_BUILD_SUPPLICANT),true)
 ########################
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := p2p_cli
+LOCAL_MODULE := wpa_cli
 LOCAL_MODULE_TAGS := debug
 LOCAL_SHARED_LIBRARIES := libc libcutils
 LOCAL_CFLAGS := $(L_CFLAGS)
@@ -1378,12 +1378,11 @@ include $(BUILD_EXECUTABLE)
 
 ########################
 include $(CLEAR_VARS)
+LOCAL_MODULE := wpa_supplicant
 LOCAL_SHARED_LIBRARIES := libc libcutils libcrypto libssl
 ifdef CONFIG_DRIVER_NL80211
 LOCAL_SHARED_LIBRARIES += libnl
 endif
-LOCAL_MODULE := p2p_supplicant
-LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
 LOCAL_C_INCLUDES := bionic/libc/kernel/common $(INCLUDES)
@@ -1418,13 +1417,12 @@ include $(BUILD_EXECUTABLE)
 
 endif # ifeq ($(WPA_BUILD_SUPPLICANT),true)
 
-#include $(CLEAR_VARS)
-#LOCAL_MODULE = libp2p_client
-#LOCAL_MODULE_TAGS := optional
-#LOCAL_CFLAGS = $(L_CFLAGS)
-#LOCAL_SRC_FILES = src/common/wpa_ctrl.c src/utils/os_$(CONFIG_OS).c
-#LOCAL_C_INCLUDES = $(INCLUDES)
-#LOCAL_SHARED_LIBRARIES := libcutils
-#LOCAL_COPY_HEADERS_TO := libwpa_client
-#LOCAL_COPY_HEADERS := src/common/wpa_ctrl.h
-#include $(BUILD_SHARED_LIBRARY)
+include $(CLEAR_VARS)
+LOCAL_MODULE = libwpa_client
+LOCAL_CFLAGS = $(L_CFLAGS)
+LOCAL_SRC_FILES = src/common/wpa_ctrl.c src/utils/os_$(CONFIG_OS).c
+LOCAL_C_INCLUDES = $(INCLUDES)
+LOCAL_SHARED_LIBRARIES := libcutils
+LOCAL_COPY_HEADERS_TO := libwpa_client
+LOCAL_COPY_HEADERS := src/common/wpa_ctrl.h
+include $(BUILD_SHARED_LIBRARY)
