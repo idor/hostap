@@ -2259,6 +2259,20 @@ struct wpa_driver_ops {
 	 * implementation, there is no need to implement this function.
 	 */
 	int (*set_authmode)(void *priv, int authmode);
+
+#ifdef ANDROID
+    /**
+     * driver_cmd - execute driver-specific command
+     * @priv: private driver interface data from init()
+     * @cmd: command to execute
+     * @buf: return buffer
+     * @buf_len: buffer length
+	 *
+	 * Returns: 0 on success, -1 on failure
+	 *
+	 */
+     int (*driver_cmd)(void *priv, char *cmd, char *buf, size_t buf_len);
+#endif /* ANDROID */
 };
 
 

@@ -2097,6 +2097,21 @@ static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
 }
 
 
+#ifdef ANDROID
+static int wpa_supplicant_ctrl_iface_driver_cmd(struct wpa_supplicant *wpa_s,
+                                     char *cmd, char *buf, size_t buflen)
+{
+    int ret;
+
+    ret = wpa_drv_driver_cmd(wpa_s, cmd, buf, buflen);
+    if (ret == 0)
+        ret = sprintf(buf, "%s\n", "OK");
+
+    return ret;
+}
+#endif /* ANDROID */
+
+
 #ifdef CONFIG_P2P
 static int p2p_ctrl_find(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -3244,6 +3259,10 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "BSS ", 4) == 0) {
 		reply_len = wpa_supplicant_ctrl_iface_bss(
 			wpa_s, buf + 4, reply, reply_size);
+#ifdef ANDROID
+    } else if (os_strncmp(buf, "DRIVER ", 7) == 0) {
+        reply_len = wpa_supplicant_ctrl_iface_driver_cmd(wpa_s, buf + 7, reply, reply_size);
+#endif /* ANDROID */
 #ifdef CONFIG_AP
 	} else if (os_strcmp(buf, "STA-FIRST") == 0) {
 		reply_len = ap_ctrl_iface_sta_first(wpa_s, reply, reply_size);
