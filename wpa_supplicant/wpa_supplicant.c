@@ -49,6 +49,9 @@
 #include "bgscan.h"
 #include "bss.h"
 #include "scan.h"
+#ifdef ANDROID
+#include <cutils/properties.h>
+#endif /* ANDROID */
 
 const char *wpa_supplicant_version =
 "wpa_supplicant v" VERSION_STR "\n"
@@ -744,7 +747,11 @@ int wpa_supplicant_reload_configuration(struct wpa_supplicant *wpa_s)
 	wpa_supplicant_clear_status(wpa_s);
 	if (wpa_supplicant_enabled_networks(wpa_s->conf)) {
 		wpa_s->reassociate = 1;
+#ifdef ANDROID
+		wpa_supplicant_req_scan(wpa_s, 2, 0);
+#else /* ANDROID */
 		wpa_supplicant_req_scan(wpa_s, 0, 0);
+#endif /* ANDROID */
 	}
 	wpa_dbg(wpa_s, MSG_DEBUG, "Reconfiguration completed");
 	return 0;
@@ -1538,7 +1545,11 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 					wpa_s, other_ssid);
 		}
 		if (wpa_s->reassociate)
+#ifdef ANDROID
+			wpa_supplicant_req_scan(wpa_s, 2, 0);
+#else /* ANDROID */
 			wpa_supplicant_req_scan(wpa_s, 0, 0);
+#endif /* ANDROID */
 	} else if (ssid->disabled && ssid->disabled != 2) {
 		if (wpa_s->current_ssid == NULL) {
 			/*
@@ -1546,7 +1557,11 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 			 * configuration and a new network was made available.
 			 */
 			wpa_s->reassociate = 1;
+#ifdef ANDROID
+			wpa_supplicant_req_scan(wpa_s, 2, 0);
+#else /* ANDROID */
 			wpa_supplicant_req_scan(wpa_s, 0, 0);
+#endif /* ANDROID */
 		}
 
 		was_disabled = ssid->disabled;
@@ -1657,6 +1672,14 @@ int wpa_supplicant_set_ap_scan(struct wpa_supplicant *wpa_s, int ap_scan)
 
 	if (ap_scan < 0 || ap_scan > 2)
 		return -1;
+
+#ifdef ANDROID
+	if ((ap_scan == 2) && (wpa_s->wpa_state != WPA_COMPLETED)) {
+		wpa_msg(wpa_s, MSG_DEBUG, "ap_scan = %d", wpa_s->conf->ap_scan);
+		return 0;
+	}
+	wpa_msg(wpa_s, MSG_DEBUG, "ap_scan = %d", ap_scan);
+#endif /* ANDROID */
 
 	old_ap_scan = wpa_s->conf->ap_scan;
 	wpa_s->conf->ap_scan = ap_scan;
@@ -2372,6 +2395,17 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 		os_free(wpa_s);
 		return NULL;
 	}
+
+#ifdef ANDROID
+    char scan_prop[PROPERTY_VALUE_MAX];
+    char *endp;
+    if (property_get("wifi.supplicant_scan_interval", scan_prop, "6") != 0) {
+        wpa_s->scan_interval = (int)strtol(scan_prop, &endp, 0);
+        if (endp == scan_prop) {
+            wpa_s->scan_interval = 6;
+        }
+    }
+#endif /* ANDROID */
 
 	for (ssid = wpa_s->conf->ssid; ssid; ssid = ssid->next)
 		wpas_notify_network_added(wpa_s, ssid);
