@@ -2497,10 +2497,24 @@ static struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "bssid", wpa_cli_cmd_bssid,
 	  cli_cmd_flag_none,
 	  "<network id> <BSSID> = set preferred BSSID for an SSID" },
+<<<<<<< HEAD
 	{ "log_level", wpa_cli_cmd_log_level,
 	  cli_cmd_flag_none,
 	  "<level> [<timestamp>] = update the log level/timestamp\n"
 	  "log_level = display the current log level and log options" },
+=======
+#ifdef ANDROID
+	{ "blacklist", wpa_cli_cmd_blacklist,
+	  cli_cmd_flag_none,
+	  "<BSSID> = add a BSSID to the blacklist\n"
+	  "blacklist clear = clear the blacklist\n"
+	  "blacklist = display the blacklist" },
+	{ "log_level", wpa_cli_cmd_log_level,
+	  cli_cmd_flag_none,
+	  "<level> [<timestamp>] = update the log level/timestamp of wpa_supplicant\n"
+	  "log_level = display the current log level and log options" },
+#endif /* ANDROID */
+>>>>>>> cli/ctrl_iface - added blacklist and log_level commands
 	{ "list_networks", wpa_cli_cmd_list_networks,
 	  cli_cmd_flag_none,
 	  "= list configured networks" },

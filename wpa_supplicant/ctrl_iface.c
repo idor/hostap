@@ -39,6 +39,9 @@
 #include "scan.h"
 #include "ctrl_iface.h"
 #include "interworking.h"
+#ifdef ANDROID
+#include "blacklist.h"
+#endif /* ANDROIRD */
 
 extern struct wpa_driver_ops *wpa_drivers[];
 
