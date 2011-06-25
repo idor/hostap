@@ -62,6 +62,10 @@ extern "C" {
 #define WPA_EVENT_BSS_ADDED "CTRL-EVENT-BSS-ADDED "
 /** A BSS entry was removed (followed by BSS entry id and BSSID) */
 #define WPA_EVENT_BSS_REMOVED "CTRL-EVENT-BSS-REMOVED "
+#ifdef ANDROID
+/** Driver state change */
+#define WPA_EVENT_DRIVER_STATE "CTRL-EVENT-DRIVER-STATE "
+#endif /* ANDROID */
 
 /** WPS overlap detected in PBC mode */
 #define WPS_EVENT_OVERLAP "WPS-OVERLAP-DETECTED "
