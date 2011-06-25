@@ -264,6 +264,7 @@ int wpa_ctrl_pending(struct wpa_ctrl *ctrl);
  */
 int wpa_ctrl_get_fd(struct wpa_ctrl *ctrl);
 
+
 #ifdef ANDROID
 /**
  * wpa_ctrl_cleanup() - Delete any local UNIX domain socket files that
@@ -273,7 +274,8 @@ int wpa_ctrl_get_fd(struct wpa_ctrl *ctrl);
  * of the normal orderly shutdown.
  */
 void wpa_ctrl_cleanup(void);
-#endif /* ANDROID */
+#endif  /* ANDROID */
+
 
 #ifdef CONFIG_CTRL_IFACE_UDP
 #define WPA_CTRL_IFACE_PORT 9877
