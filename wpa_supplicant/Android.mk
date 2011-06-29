@@ -26,7 +26,7 @@ ifneq ($(TARGET_SIMULATOR),true)
   endif
 endif
 
-include $(LOCAL_PATH)/.config
+include $(LOCAL_PATH)/config-android
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
