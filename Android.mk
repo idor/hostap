@@ -1,1 +1,3 @@
-include $(call all-named-subdir-makefiles, wpa_supplicant)
+ifeq ($(WPA_SUPPLICANT_VERSION),VER_0_8_X)
+    include $(call all-subdir-makefiles)
+endif

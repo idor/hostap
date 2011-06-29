@@ -10,10 +10,10 @@
 # to override previous values of the variables.
 
 # Driver interface for Host AP driver
-#CONFIG_DRIVER_HOSTAP:=
+CONFIG_DRIVER_HOSTAP:=
 
 # Driver interface for wired authenticator
-#CONFIG_DRIVER_WIRED:=
+CONFIG_DRIVER_WIRED:=
 
 # Driver interface for madwifi driver
 #CONFIG_DRIVER_MADWIFI:=

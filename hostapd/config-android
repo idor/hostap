@@ -10,7 +10,7 @@
 # to override previous values of the variables.
 
 # Driver interface for Host AP driver
-#CONFIG_DRIVER_HOSTAP=y
+CONFIG_DRIVER_HOSTAP=y
 
 # Driver interface for wired authenticator
 #CONFIG_DRIVER_WIRED=y
@@ -108,7 +108,7 @@ CONFIG_EAP_TTLS=y
 # Wi-Fi Protected Setup (WPS)
 CONFIG_WPS=y
 # Enable WSC 2.0 support
-#CONFIG_WPS2=y
+CONFIG_WPS2=y
 # Enable UPnP support for external WPS Registrars
 CONFIG_WPS_UPNP=y
 
