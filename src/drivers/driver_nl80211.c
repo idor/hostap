@@ -3793,12 +3793,30 @@ nla_put_failure:
 }
 
 
+static u32 sta_flags_nl80211(int flags)
+{
+	u32 f = 0;
+
+	if (flags & WPA_STA_AUTHORIZED)
+		f |= BIT(NL80211_STA_FLAG_AUTHORIZED);
+	if (flags & WPA_STA_WMM)
+		f |= BIT(NL80211_STA_FLAG_WME);
+	if (flags & WPA_STA_SHORT_PREAMBLE)
+		f |= BIT(NL80211_STA_FLAG_SHORT_PREAMBLE);
+	if (flags & WPA_STA_MFP)
+		f |= BIT(NL80211_STA_FLAG_MFP);
+
+	return f;
+}
+
+
 static int wpa_driver_nl80211_sta_add(void *priv,
 				      struct hostapd_sta_add_params *params)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct nl_msg *msg;
+	struct nl_msg *msg, *wme = NULL;
+	struct nl80211_sta_flag_update upd;
 	int ret = -ENOBUFS;
 
 	msg = nlmsg_alloc();
@@ -3821,13 +3839,32 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 			params->ht_capabilities);
 	}
 
+	os_memset(&upd, 0, sizeof(upd));
+	upd.mask = sta_flags_nl80211(params->flags);
+	upd.set = upd.mask;
+	NLA_PUT(msg, NL80211_ATTR_STA_FLAGS2, sizeof(upd), &upd);
+
+	wme = nlmsg_alloc();
+	if (!wme)
+		goto nla_put_failure;
+
+	NLA_PUT_U8(wme, NL80211_STA_WME_UAPSD_QUEUES, params->uapsd_queues);
+	NLA_PUT_U8(wme, NL80211_STA_WME_MAX_SP, params->max_sp);
+	nla_put_nested(msg, NL80211_ATTR_STA_WME, wme);
+
+	nlmsg_free(wme);
+
 	ret = send_and_recv_msgs(drv, msg, NULL, NULL);
 	if (ret)
 		wpa_printf(MSG_DEBUG, "nl80211: NL80211_CMD_NEW_STATION "
 			   "result: %d (%s)", ret, strerror(-ret));
 	if (ret == -EEXIST)
 		ret = 0;
+
+	return ret;
  nla_put_failure:
+ 	if (wme)
+		nlmsg_free(wme);
 	return ret;
 }
 
@@ -4399,23 +4436,6 @@ static int wpa_driver_nl80211_hapd_send_eapol(
 	os_free(hdr);
 
 	return res;
-}
-
-
-static u32 sta_flags_nl80211(int flags)
-{
-	u32 f = 0;
-
-	if (flags & WPA_STA_AUTHORIZED)
-		f |= BIT(NL80211_STA_FLAG_AUTHORIZED);
-	if (flags & WPA_STA_WMM)
-		f |= BIT(NL80211_STA_FLAG_WME);
-	if (flags & WPA_STA_SHORT_PREAMBLE)
-		f |= BIT(NL80211_STA_FLAG_SHORT_PREAMBLE);
-	if (flags & WPA_STA_MFP)
-		f |= BIT(NL80211_STA_FLAG_MFP);
-
-	return f;
 }
 
 
