@@ -332,7 +332,7 @@ int hostapd_sta_add(struct hostapd_data *hapd,
 	params.supp_rates_len = supp_rates_len;
 	params.listen_interval = listen_interval;
 	params.ht_capabilities = ht_capab;
-	params.flags = flags;
+	params.flags = hostapd_sta_flags_to_drv(flags);
 	params.uapsd_queues = uapsd_queues;
 	params.max_sp = max_sp;
 	return hapd->driver->sta_add(hapd->drv_priv, &params);
