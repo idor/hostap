@@ -20,6 +20,9 @@
 #include "utils/eloop.h"
 #include "utils/edit.h"
 #include "common/version.h"
+#ifdef ANDROID
+#include <cutils/properties.h>
+#endif /* ANDROID */
 
 
 static const char *hostapd_cli_version =
@@ -146,17 +149,27 @@ static void usage(void)
 
 static struct wpa_ctrl * hostapd_cli_open_connection(const char *ifname)
 {
-	char *cfile;
+	char *cfile = NULL;
 	int flen;
 
 	if (ifname == NULL)
 		return NULL;
 
-	flen = strlen(ctrl_iface_dir) + strlen(ifname) + 2;
-	cfile = malloc(flen);
-	if (cfile == NULL)
-		return NULL;
-	snprintf(cfile, flen, "%s/%s", ctrl_iface_dir, ifname);
+#ifdef ANDROID
+	if (access(ctrl_iface_dir, F_OK) < 0) {
+		cfile = os_strdup(ifname);
+		if (cfile == NULL)
+			return NULL;
+	}
+#endif /* ANDROID */
+
+	if (cfile == NULL) {
+		flen = strlen(ctrl_iface_dir) + strlen(ifname) + 2;
+		cfile = malloc(flen);
+		if (cfile == NULL)
+			return NULL;
+		snprintf(cfile, flen, "%s/%s", ctrl_iface_dir, ifname);
+	}
 
 	ctrl_conn = wpa_ctrl_open(cfile);
 	free(cfile);
@@ -1037,6 +1050,15 @@ int main(int argc, char *argv[])
 				}
 				closedir(dir);
 			}
+#ifdef ANDROID
+			else {
+				char ifprop[PROPERTY_VALUE_MAX];
+				if (property_get("ap.interface", ifprop, NULL) != 0) {
+					ctrl_ifname = os_strdup(ifprop);
+					printf("Using interface '%s'\n", ctrl_ifname);
+				}
+			}
+#endif /* ANDROID */
 		}
 		ctrl_conn = hostapd_cli_open_connection(ctrl_ifname);
 		if (ctrl_conn) {
