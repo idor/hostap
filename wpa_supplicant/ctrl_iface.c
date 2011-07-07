@@ -41,7 +41,7 @@
 #include "interworking.h"
 #ifdef ANDROID
 #include "blacklist.h"
-#endif /* ANDROIRD */
+#endif /* ANDROID */
 
 extern struct wpa_driver_ops *wpa_drivers[];
 
