@@ -196,8 +196,6 @@ CONFIG_EAP_LEAP=y
 CONFIG_WPS=y
 # Enable WSC 2.0 support
 CONFIG_WPS2=y
-# Enable UPnP support for external WPS Registrars
-CONFIG_WPS_UPNP=y
 
 # EAP-IKEv2
 #CONFIG_EAP_IKEV2=y
