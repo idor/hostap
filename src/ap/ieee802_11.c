@@ -822,6 +822,75 @@ static void send_deauth(struct hostapd_data *hapd, const u8 *addr,
 			   strerror(errno));
 }
 
+static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
+{
+	struct ieee80211_ht_capabilities ht_cap;
+	int new_assoc = 1;
+
+	if (sta->flags & WLAN_STA_ASSOC)
+		new_assoc = 0;
+	sta->flags |= WLAN_STA_ASSOC;
+
+	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
+	    sta->auth_alg == WLAN_AUTH_FT) {
+		/*
+		 * Open, static WEP, or FT protocol; no separate authorization
+		 * step.
+		 */
+		ap_sta_set_authorized(hapd, sta, 1);
+		wpa_msg(hapd->msg_ctx, MSG_INFO,
+			AP_STA_CONNECTED MACSTR, MAC2STR(sta->addr));
+	}
+
+	/*
+	 * Remove the STA entry in order to make sure the STA PS state gets
+	 * cleared and configuration gets updated in case of reassociation back
+	 * to the same AP.
+	 */
+	hostapd_drv_sta_remove(hapd, sta->addr);
+
+#ifdef CONFIG_IEEE80211N
+	if (sta->flags & WLAN_STA_HT)
+		hostapd_get_ht_capab(hapd, sta->ht_capabilities, &ht_cap);
+#endif /* CONFIG_IEEE80211N */
+
+	if (hostapd_sta_add(hapd, sta->addr, sta->aid, sta->capability,
+			    sta->supported_rates, sta->supported_rates_len,
+			    sta->listen_interval,
+			    sta->flags & WLAN_STA_HT ? &ht_cap : NULL,
+			    sta->flags, sta->uapsd_queues, sta->max_sp)) {
+		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE80211,
+			       HOSTAPD_LEVEL_NOTICE,
+			       "Could not add STA to kernel driver");
+	}
+
+	if (sta->flags & WLAN_STA_WDS)
+		hostapd_set_wds_sta(hapd, sta->addr, sta->aid, 1);
+
+	if (sta->eapol_sm == NULL) {
+		/*
+		 * This STA does not use RADIUS server for EAP authentication,
+		 * so bind it to the selected VLAN interface now, since the
+		 * interface selection is not going to change anymore.
+		 */
+		if (ap_sta_bind_vlan(hapd, sta, 0) < 0)
+			return;//goto fail;
+	} else if (sta->vlan_id) {
+		/* VLAN ID already set (e.g., by PMKSA caching), so bind STA */
+		if (ap_sta_bind_vlan(hapd, sta, 0) < 0)
+			return; //goto fail;
+	}
+
+	hostapd_set_sta_flags(hapd, sta);
+
+	if (sta->auth_alg == WLAN_AUTH_FT)
+		wpa_auth_sm_event(sta->wpa_sm, WPA_ASSOC_FT);
+	else
+		wpa_auth_sm_event(sta->wpa_sm, WPA_ASSOC);
+	hapd->new_assoc_sta_cb(hapd, sta, !new_assoc);
+
+	ieee802_1x_notify_port_enabled(sta->eapol_sm, 1);
+}
 
 static void send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 			    u16 status_code, int reassoc, const u8 *ies,
