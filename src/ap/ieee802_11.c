@@ -880,6 +880,17 @@ static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 		new_assoc = 0;
 	sta->flags |= WLAN_STA_ASSOC;
 
+	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
+	    sta->auth_alg == WLAN_AUTH_FT) {
+		/*
+		 * Open, static WEP, or FT protocol; no separate authorization
+		 * step.
+		 */
+		ap_sta_set_authorized(hapd, sta, 1);
+		wpa_msg(hapd->msg_ctx, MSG_INFO,
+			AP_STA_CONNECTED MACSTR, MAC2STR(sta->addr));
+	}
+
 	/*
 	 * Remove the STA entry in order to make sure the STA PS state gets
 	 * cleared and configuration gets updated in case of reassociation back
@@ -1739,17 +1750,6 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 		       HOSTAPD_LEVEL_INFO,
 		       "associated (aid %d)",
 		       sta->aid);
-
-	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
-	    sta->auth_alg == WLAN_AUTH_FT) {
-		/*
-		 * Open, static WEP, or FT protocol; no separate authorization
-		 * step.
-		 */
-		ap_sta_set_authorized(hapd, sta, 1);
-		wpa_msg(hapd->msg_ctx, MSG_INFO,
-			AP_STA_CONNECTED MACSTR, MAC2STR(sta->addr));
-	}
 
 	if (reassoc)
 		mlme_reassociate_indication(hapd, sta);
