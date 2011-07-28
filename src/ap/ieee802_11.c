@@ -831,6 +831,7 @@ static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 		new_assoc = 0;
 	sta->flags |= WLAN_STA_ASSOC;
 
+<<<<<<< HEAD
 	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
 	    sta->auth_alg == WLAN_AUTH_FT) {
 		/*
@@ -842,6 +843,8 @@ static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 			AP_STA_CONNECTED MACSTR, MAC2STR(sta->addr));
 	}
 
+=======
+>>>>>>> Revert "Revert "AP: Add station before sending the association response""
 	/*
 	 * Remove the STA entry in order to make sure the STA PS state gets
 	 * cleared and configuration gets updated in case of reassociation back
@@ -983,6 +986,11 @@ static void send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 		}
 	}
 #endif /* CONFIG_P2P */
+
+	if (status_code == WLAN_STATUS_SUCCESS) {
+		wpa_printf(MSG_DEBUG, "Adding associated sta");
+		add_assoc_sta(hapd, sta);
+	}
 
 #ifdef CONFIG_P2P_MANAGER
 	if (hapd->conf->p2p & P2P_MANAGE)
@@ -1547,8 +1555,6 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 {
 	u16 status;
 	struct sta_info *sta;
-	int new_assoc = 1;
-	struct ieee80211_ht_capabilities ht_cap;
 
 	if (!ok) {
 		hostapd_logger(hapd, mgmt->da, HOSTAPD_MODULE_IEEE80211,
@@ -1588,9 +1594,6 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 		       "associated (aid %d)",
 		       sta->aid);
 
-	if (sta->flags & WLAN_STA_ASSOC)
-		new_assoc = 0;
-	sta->flags |= WLAN_STA_ASSOC;
 	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
 	    sta->auth_alg == WLAN_AUTH_FT) {
 		/*
