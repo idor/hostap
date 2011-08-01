@@ -435,6 +435,8 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 
 	if (wpa_s->parent->set_ap_uapsd)
 		params.uapsd = wpa_s->parent->ap_uapsd;
+	else
+		params.uapsd = -1;
 
 	if (wpa_drv_associate(wpa_s, &params) < 0) {
 		wpa_msg(wpa_s, MSG_INFO, "Failed to start AP functionality");
@@ -464,10 +466,6 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	if (params.uapsd) {
-		conf->bss->wmm_enabled = 1;
-		conf->bss->wmm_uapsd = 1;
-	}
 #ifdef CONFIG_P2P
 	if (ssid->mode == WPAS_MODE_P2P_GO)
 		conf->bss[0].p2p = P2P_ENABLED | P2P_GROUP_OWNER;
