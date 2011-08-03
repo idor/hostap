@@ -831,7 +831,6 @@ static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 		new_assoc = 0;
 	sta->flags |= WLAN_STA_ASSOC;
 
-<<<<<<< HEAD
 	if ((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
 	    sta->auth_alg == WLAN_AUTH_FT) {
 		/*
@@ -843,8 +842,6 @@ static void add_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 			AP_STA_CONNECTED MACSTR, MAC2STR(sta->addr));
 	}
 
-=======
->>>>>>> Revert "Revert "AP: Add station before sending the association response""
 	/*
 	 * Remove the STA entry in order to make sure the STA PS state gets
 	 * cleared and configuration gets updated in case of reassociation back
