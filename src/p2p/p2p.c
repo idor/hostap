@@ -1490,20 +1490,17 @@ static void p2p_invite_start(void *eloop_ctx, void *timeout_ctx)
 }
 
 
-static int p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
-				      const u8 *ie, size_t ie_len)
+static void p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
+				       const u8 *ie, size_t ie_len)
 {
 	struct p2p_message msg;
 	struct p2p_device *dev;
-	struct ieee802_11_elems elems;
-	int i;
-	u8 b_only;
 
 	os_memset(&msg, 0, sizeof(msg));
 	if (p2p_parse_ies(ie, ie_len, &msg) < 0 || msg.p2p_attributes == NULL)
 	{
 		p2p_parse_free(&msg);
-		return 1; /* not a P2P probe */
+		return; /* not a P2P probe */
 	}
 
 	if (msg.ssid == NULL || msg.ssid[1] != P2P_WILDCARD_SSID_LEN ||
@@ -1515,32 +1512,7 @@ static int p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
 		 * peer entry based on this frames.
 		 */
 		p2p_parse_free(&msg);
-		return 1;
-	}
-
-	if (ieee802_11_parse_elems(ie, ie_len, &elems, 1) == ParseFailed)
-		return 1;
-
-	if (!elems.supp_rates)
-		return 1;
-
-	b_only = 1;
-	for (i = 0; i < elems.supp_rates_len; i++) {
-		u8 supp_rate = elems.supp_rates[i] & 0x7f;
-		switch (supp_rate) {
-		case 2:
-		case 4:
-		case 11:
-		case 22:
-			break;
-		default:
-			b_only = 0;
-		}
-	}
-	if (b_only) {
-		wpa_msg(p2p->cfg->msg_ctx, MSG_DEBUG,
-			"P2P: probe request contains only 11b rates!");
-		return 1;
+		return;
 	}
 
 	dev = p2p_get_device(p2p, addr);
@@ -1549,13 +1521,13 @@ static int p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
 			os_memcpy(dev->country, msg.listen_channel, 3);
 		os_get_time(&dev->last_seen);
 		p2p_parse_free(&msg);
-		return 0; /* already known */
+		return; /* already known */
 	}
 
 	dev = p2p_create_device(p2p, addr);
 	if (dev == NULL) {
 		p2p_parse_free(&msg);
-		return 1;
+		return;
 	}
 
 	os_get_time(&dev->last_seen);
@@ -1578,7 +1550,6 @@ static int p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
 		MAC2STR(dev->info.p2p_device_addr), dev->info.dev_capab,
 		dev->info.group_capab, dev->info.device_name,
 		dev->listen_freq);
-	return 0;
 }
 
 
@@ -1861,8 +1832,7 @@ static void p2p_reply_probe(struct p2p_data *p2p, const u8 *addr,
 int p2p_probe_req_rx(struct p2p_data *p2p, const u8 *addr, const u8 *dst,
 		     const u8 *bssid, const u8 *ie, size_t ie_len)
 {
-	if (p2p_add_dev_from_probe_req(p2p, addr, ie, ie_len))
-		return 1;
+	p2p_add_dev_from_probe_req(p2p, addr, ie, ie_len);
 
 	p2p_reply_probe(p2p, addr, dst, bssid, ie, ie_len);
 
