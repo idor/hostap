@@ -1491,4 +1491,6 @@ void p2p_remove_wps_vendor_extensions(struct p2p_data *p2p);
 int p2p_add_wps_vendor_extension(struct p2p_data *p2p,
 				 const struct wpabuf *vendor_ext);
 
+int p2p_prepare_channel(struct p2p_data *p2p, unsigned int force_freq);
+
 #endif /* P2P_H */
