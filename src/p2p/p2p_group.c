@@ -21,6 +21,7 @@
 #include "wps/wps_i.h"
 #include "p2p_i.h"
 #include "p2p.h"
+#include "wfd/wfd_i.h"
 
 
 struct p2p_group_member {
@@ -328,7 +329,10 @@ int p2p_group_notif_assoc(struct p2p_group *group, const u8 *addr,
 						       &m->dev_capab,
 						       m->dev_addr);
 	}
-
+#ifdef CONFIG_WFD
+	/* Notify Wi-Fi display module regarding new assosiated WFD device */
+	wfd_notify_dev_associated(group->cfg->cb_ctx, group->p2p->wfd, addr);
+#endif /* CONFIG_WFD */
 	m->next = group->members;
 	group->members = m;
 	group->num_members++;
@@ -384,7 +388,9 @@ void p2p_group_notif_disassoc(struct p2p_group *group, const u8 *addr)
 		prev = m;
 		m = m->next;
 	}
-
+#ifdef CONFIG_WFD
+	wfd_notify_dev_diassociated(group->cfg->cb_ctx, group->p2p->wfd, addr);
+#endif /* CONFIG_WFD */
 	if (m) {
 		if (prev)
 			prev->next = m->next;

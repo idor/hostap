@@ -21,6 +21,7 @@
 #include "wps/wps_i.h"
 #include "p2p_i.h"
 #include "p2p.h"
+#include "wfd/wfd_i.h"
 
 
 static void p2p_state_timeout(void *eloop_ctx, void *timeout_ctx);
@@ -577,7 +578,26 @@ int p2p_add_device(struct p2p_data *p2p, const u8 *addr, int freq, int level,
 	if (msg.group_info)
 		dev->oper_freq = freq;
 	dev->level = level;
+#ifdef CONFIG_WFD
+	dev->info.wfd_ie = ieee802_11_vendor_ie_concat(ies, ies_len,
+							WFD_IE_VENDOR_TYPE);
+	if (dev->info.wfd_ie) {
+		dev->flags |= P2P_DEV_WFD_SUPPORT;
+		if (!dev->info.wfd) {
+			dev->info.wfd = os_zalloc(sizeof(*dev->info.wfd));
+			if (!dev->info.wfd)
+				return -1;
+		}
+		/* Parse WFD IE */
+		wpa_msg(p2p->cfg->msg_ctx, MSG_DEBUG,
+					"P2P: Parse WFD IE");
+		if (wfd_parse_ies(dev->info.wfd_ie, dev->info.wfd))
+			return -1;
 
+		if (wfd_add_device(p2p->wfd, dev->info.wfd, addr))
+			return -1;
+	}
+#endif /* CONFIG_WFD */
 	p2p_copy_wps_info(dev, 0, &msg);
 
 	for (i = 0; i < P2P_MAX_WPS_VENDOR_EXT; i++) {
@@ -640,7 +660,15 @@ static void p2p_device_free(struct p2p_data *p2p, struct p2p_device *dev)
 		wpabuf_free(dev->info.wps_vendor_ext[i]);
 		dev->info.wps_vendor_ext[i] = NULL;
 	}
-
+#ifdef CONFIG_WFD
+	if (dev->info.wfd_ie) {
+		wpabuf_free(dev->info.wfd_ie);
+		dev->info.wfd_ie = NULL;
+		os_free(dev->info.wfd);
+		dev->info.wfd = NULL;
+		wfd_device_free(p2p->wfd, dev->info.p2p_device_addr);
+	}
+#endif /* CONFIG_WFD */
 	os_free(dev);
 }
 
@@ -1521,7 +1549,21 @@ static void p2p_add_dev_from_probe_req(struct p2p_data *p2p, const u8 *addr,
 						       msg.listen_channel[3],
 						       msg.listen_channel[4]);
 	}
-
+#ifdef CONFIG_WFD
+	dev->info.wfd_ie = ieee802_11_vendor_ie_concat(ie, ie_len,
+							WFD_IE_VENDOR_TYPE);
+	if (dev->info.wfd_ie) {
+		dev->flags |= P2P_DEV_WFD_SUPPORT;
+		dev->info.wfd = os_zalloc(sizeof(*dev->info.wfd));
+		if (dev->info.wfd)
+			return -1;
+		/* Parse WFD IE */
+		if (wfd_parse_ies(dev->info.wfd_ie, dev->info.wfd))
+			return -1;
+		if (wfd_add_device(p2p->wfd, dev->info.wfd, addr))
+			return -1;
+	}
+#endif /* CONFIG_WFD */
 	p2p_copy_wps_info(dev, 1, &msg);
 
 	p2p_parse_free(&msg);
@@ -1636,6 +1678,9 @@ struct wpabuf * p2p_build_probe_resp_ies(struct p2p_data *p2p)
 					      p2p->ext_listen_interval);
 	p2p_buf_add_device_info(buf, p2p, NULL);
 	p2p_buf_update_ie_hdr(buf, len);
+#ifdef CONFIG_WFD
+	wfd_build_prob_resp_ies(p2p->wfd, buf);
+#endif /* CONFIG_WFD */
 
 	return buf;
 }
@@ -2409,6 +2454,9 @@ void p2p_scan_ie(struct p2p_data *p2p, struct wpabuf *ies)
 					      p2p->ext_listen_interval);
 	/* TODO: p2p_buf_add_operating_channel() if GO */
 	p2p_buf_update_ie_hdr(ies, len);
+#ifdef CONFIG_WFD
+	wfd_build_probe_req_ies(p2p->wfd, ies);
+#endif
 }
 
 
@@ -2984,10 +3032,16 @@ int p2p_get_peer_info(struct p2p_data *p2p, const u8 *addr, int next,
 			  "country=%c%c\n"
 			  "oper_freq=%d\n"
 			  "req_config_methods=0x%x\n"
-			  "flags=%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+			  "flags=%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			  "status=%d\n"
 			  "wait_count=%u\n"
-			  "invitation_reqs=%u\n",
+			  "invitation_reqs=%u\n"
+#ifdef CONFIG_WFD
+			  "wfd_device_info=0x%x\n"
+			  "wfd_session_mgmt_port=%u\n"
+			  "wfd_dev_max_tp=%u\n"
+#endif /* CONFIG_WFD */
+			  ,
 			  (int) (now.sec - dev->last_seen.sec),
 			  dev->listen_freq,
 			  dev->level,
@@ -3041,9 +3095,19 @@ int p2p_get_peer_info(struct p2p_data *p2p, const u8 *addr, int next,
 			  "[FORCE_FREQ]" : "",
 			  dev->flags & P2P_DEV_PD_FOR_JOIN ?
 			  "[PD_FOR_JOIN]" : "",
+			  dev->flags & P2P_DEV_WFD_SUPPORT ?
+			  "[WFD_SUPPORT]" : "",
 			  dev->status,
 			  dev->wait_count,
-			  dev->invitation_reqs);
+			  dev->invitation_reqs
+#ifdef CONFIG_WFD
+			  ,
+			  dev->info.wfd ?
+				dev->info.wfd->device_info_bitmap : 0xFF,
+			  dev->info.wfd ? dev->info.wfd->session_mng_port : 0,
+			  dev->info.wfd ? dev->info.wfd->maximum_tp : 0
+#endif /* CONFIG_WFD */
+			  );
 	if (res < 0 || res >= end - pos)
 		return pos - buf;
 	pos += res;
@@ -3617,3 +3681,9 @@ p2p_get_peer_found(struct p2p_data *p2p, const u8 *addr, int next)
 
 	return &dev->info;
 }
+#ifdef CONFIG_WFD
+void p2p_register_wfd(struct p2p_data *p2p, struct wfd_data *wfd)
+{
+	p2p->wfd = wfd;
+}
+#endif

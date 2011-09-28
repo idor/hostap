@@ -203,6 +203,11 @@ struct p2p_srv_upnp {
 	char *service;
 };
 
+struct p2p_srv_wfd {
+	struct dl_list list;
+	struct wpabuf *query;
+	struct wpabuf *resp;
+};
 /**
  * struct wpa_global - Internal, global data for all %wpa_supplicant interfaces
  *
@@ -222,8 +227,11 @@ struct wpa_global {
 	u8 p2p_dev_addr[ETH_ALEN];
 	struct dl_list p2p_srv_bonjour; /* struct p2p_srv_bonjour */
 	struct dl_list p2p_srv_upnp; /* struct p2p_srv_upnp */
+	struct dl_list p2p_srv_wfd;  /* struct p2p_srv wfd */
 	int p2p_disabled;
 	int cross_connection;
+	struct wfd_data *wfd;
+	int wfd_enabled;
 };
 
 

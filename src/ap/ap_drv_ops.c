@@ -56,26 +56,42 @@ int hostapd_set_ap_wps_ie(struct hostapd_data *hapd)
 	if (hapd->wps_beacon_ie == NULL && hapd->p2p_beacon_ie == NULL)
 		beacon = NULL;
 	else {
-		beacon = wpabuf_alloc((hapd->wps_beacon_ie ?
-				       wpabuf_len(hapd->wps_beacon_ie) : 0) +
-				      (hapd->p2p_beacon_ie ?
-				       wpabuf_len(hapd->p2p_beacon_ie) : 0));
+		int beacon_len;
+		beacon_len  = (hapd->wps_beacon_ie ?
+			       wpabuf_len(hapd->wps_beacon_ie) : 0) +
+			      (hapd->p2p_beacon_ie ?
+			       wpabuf_len(hapd->p2p_beacon_ie) : 0);
+#ifdef CONFIG_WFD
+		beacon_len += (hapd->wfd_beacon_ie ?
+			       wpabuf_len(hapd->wfd_beacon_ie) : 0);
+#endif /* CONFIG_WFD */
+		beacon = wpabuf_alloc(beacon_len);
 		if (beacon == NULL)
 			return -1;
 		if (hapd->wps_beacon_ie)
 			wpabuf_put_buf(beacon, hapd->wps_beacon_ie);
 		if (hapd->p2p_beacon_ie)
 			wpabuf_put_buf(beacon, hapd->p2p_beacon_ie);
+#ifdef CONFIG_WFD
+		if (hapd->wfd_beacon_ie)
+			wpabuf_put_buf(beacon, hapd->wfd_beacon_ie);
+#endif /* CONFIG_WFD */
 	}
 
 	if (hapd->wps_probe_resp_ie == NULL && hapd->p2p_probe_resp_ie == NULL)
 		proberesp = NULL;
 	else {
-		proberesp = wpabuf_alloc(
-			(hapd->wps_probe_resp_ie ?
-			 wpabuf_len(hapd->wps_probe_resp_ie) : 0) +
-			(hapd->p2p_probe_resp_ie ?
-			 wpabuf_len(hapd->p2p_probe_resp_ie) : 0));
+		int proberesp_len;
+
+		proberesp_len = (hapd->wps_probe_resp_ie ?
+				 wpabuf_len(hapd->wps_probe_resp_ie) : 0) +
+				(hapd->p2p_probe_resp_ie ?
+				 wpabuf_len(hapd->p2p_probe_resp_ie) : 0);
+#ifdef CONFIG_WFD
+		proberesp_len += (hapd->wfd_probe_resp_ie ?
+			       wpabuf_len(hapd->wfd_probe_resp_ie) : 0);
+#endif /* CONFIG_WFD */
+		proberesp = wpabuf_alloc(proberesp_len);
 		if (proberesp == NULL) {
 			wpabuf_free(beacon);
 			return -1;
@@ -84,6 +100,11 @@ int hostapd_set_ap_wps_ie(struct hostapd_data *hapd)
 			wpabuf_put_buf(proberesp, hapd->wps_probe_resp_ie);
 		if (hapd->p2p_probe_resp_ie)
 			wpabuf_put_buf(proberesp, hapd->p2p_probe_resp_ie);
+#ifdef CONFIG_WFD
+		if (hapd->wfd_probe_resp_ie)
+			wpabuf_put_buf(proberesp, hapd->wfd_probe_resp_ie);
+#endif /* CONFIG_WFD */
+
 	}
 #endif /* CONFIG_P2P */
 

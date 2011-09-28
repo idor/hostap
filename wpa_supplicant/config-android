@@ -447,6 +447,9 @@ LIBNL=$(LIBNL_PATH)
 CONFIG_P2P=y
 CONFIG_AP=y
 
+# for Wi-Fi display
+CONFIG_WFD=y
+
 # Add support for writing debug log to Android logcat instead of standard output
 CONFIG_ANDROID_LOG=y
 

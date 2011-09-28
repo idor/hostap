@@ -82,6 +82,8 @@ void * wpas_p2p_sd_request(struct wpa_supplicant *wpa_s, const u8 *dst,
 			   const struct wpabuf *tlvs);
 void * wpas_p2p_sd_request_upnp(struct wpa_supplicant *wpa_s, const u8 *dst,
 				u8 version, const char *query);
+void * wpas_p2p_sd_request_wfd(struct wpa_supplicant *wpa_s, const u8 *dst,
+				const struct wpabuf *tlvs);
 int wpas_p2p_sd_cancel_request(struct wpa_supplicant *wpa_s, void *req);
 void wpas_p2p_sd_response(struct wpa_supplicant *wpa_s, int freq,
 			  const u8 *dst, u8 dialog_token,
@@ -96,6 +98,10 @@ int wpas_p2p_service_add_upnp(struct wpa_supplicant *wpa_s, u8 version,
 			      const char *service);
 int wpas_p2p_service_del_upnp(struct wpa_supplicant *wpa_s, u8 version,
 			      const char *service);
+int wpas_p2p_service_add_wfd(struct wpa_supplicant *wpa_s,
+				 struct wpabuf *query, struct wpabuf *resp);
+int wpas_p2p_service_del_wfd(struct wpa_supplicant *wpa_s,
+				 const struct wpabuf *query);
 int wpas_p2p_reject(struct wpa_supplicant *wpa_s, const u8 *addr);
 int wpas_p2p_invite(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		    struct wpa_ssid *ssid, const u8 *go_dev_addr);
@@ -124,5 +130,8 @@ void wpas_p2p_update_best_channels(struct wpa_supplicant *wpa_s,
 				   int freq_24, int freq_5, int freq_overall);
 int wpas_p2p_unauthorize(struct wpa_supplicant *wpa_s, const char *addr);
 int wpas_p2p_disconnect(struct wpa_supplicant *wpa_s);
+#ifdef CONFIG_WFD
+void wpas_p2p_register_wfd(struct wpa_global *global);
+#endif /* CONFIG_WFD */
 
 #endif /* P2P_SUPPLICANT_H */

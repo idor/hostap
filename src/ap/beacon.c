@@ -307,6 +307,10 @@ void handle_probe_req(struct hostapd_data *hapd,
 	if (hapd->p2p_probe_resp_ie)
 		buflen += wpabuf_len(hapd->p2p_probe_resp_ie);
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+	if (hapd->wfd_probe_resp_ie)
+		buflen += wpabuf_len(hapd->wfd_probe_resp_ie);
+#endif /* CONFIG_WFD */
 	resp = os_zalloc(buflen);
 	if (resp == NULL)
 		return;
@@ -374,6 +378,13 @@ void handle_probe_req(struct hostapd_data *hapd,
 		pos += wpabuf_len(hapd->p2p_probe_resp_ie);
 	}
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+	if (hapd->wfd_probe_resp_ie) {
+		os_memcpy(pos, wpabuf_head(hapd->wfd_probe_resp_ie),
+			  wpabuf_len(hapd->wfd_probe_resp_ie));
+		pos += wpabuf_len(hapd->wfd_probe_resp_ie);
+	}
+#endif /* CONFIG_WFD */
 #ifdef CONFIG_P2P_MANAGER
 	if ((hapd->conf->p2p & (P2P_MANAGE | P2P_ENABLED | P2P_GROUP_OWNER)) ==
 	    P2P_MANAGE)
@@ -415,6 +426,10 @@ void ieee802_11_set_beacon(struct hostapd_data *hapd)
 	if (hapd->p2p_beacon_ie)
 		tail_len += wpabuf_len(hapd->p2p_beacon_ie);
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+	if (hapd->wfd_beacon_ie)
+		tail_len += wpabuf_len(hapd->wfd_beacon_ie);
+#endif /* CONFIG_WFD */
 	tailpos = tail = os_malloc(tail_len);
 	if (head == NULL || tail == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to set beacon data");
@@ -500,6 +515,13 @@ void ieee802_11_set_beacon(struct hostapd_data *hapd)
 		tailpos += wpabuf_len(hapd->p2p_beacon_ie);
 	}
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+	if (hapd->wfd_beacon_ie /* TBD add configuration condition */) {
+		os_memcpy(tailpos, wpabuf_head(hapd->wfd_beacon_ie),
+			  wpabuf_len(hapd->wfd_beacon_ie));
+		tailpos += wpabuf_len(hapd->wfd_beacon_ie);
+	}
+#endif /* CONFIG_WFD */
 #ifdef CONFIG_P2P_MANAGER
 	if ((hapd->conf->p2p & (P2P_MANAGE | P2P_ENABLED | P2P_GROUP_OWNER)) ==
 	    P2P_MANAGE)

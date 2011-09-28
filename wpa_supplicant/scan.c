@@ -443,8 +443,13 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 #endif /* CONFIG_WPS */
 
 #ifdef CONFIG_P2P
+#ifdef CONFIG_WFD
+#define ADD_LEN	124
+#else
+#define ADD_LEN	100
+#endif
 	if (wps_ie) {
-		if (wpabuf_resize(&wps_ie, 100) == 0) {
+		if (wpabuf_resize(&wps_ie, ADD_LEN) == 0) {
 			wpas_p2p_scan_ie(wpa_s, wps_ie);
 			params.extra_ies = wpabuf_head(wps_ie);
 			params.extra_ies_len = wpabuf_len(wps_ie);

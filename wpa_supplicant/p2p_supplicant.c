@@ -21,6 +21,7 @@
 #include "common/wpa_ctrl.h"
 #include "wps/wps_i.h"
 #include "p2p/p2p.h"
+#include "wfd/wfd_i.h"
 #include "ap/hostapd.h"
 #include "ap/p2p_hostapd.h"
 #include "wpa_supplicant_i.h"
@@ -55,7 +56,17 @@ static int wpas_p2p_create_iface(struct wpa_supplicant *wpa_s);
 static void wpas_p2p_cross_connect_setup(struct wpa_supplicant *wpa_s);
 static void wpas_p2p_group_idle_timeout(void *eloop_ctx, void *timeout_ctx);
 static void wpas_p2p_set_group_idle_timeout(struct wpa_supplicant *wpa_s);
-
+static void wpas_sd_all_bonjour(struct wpa_supplicant *wpa_s,
+				struct wpabuf *resp, u8 srv_trans_id);
+#ifdef CONFIG_WFD
+static void wpas_sd_all_wfd(struct wpa_supplicant *wpa_s,
+				struct wpabuf *resp, u8 srv_trans_id);
+#endif /* CONFIG_WFD */
+#ifdef CONFIG_WFD
+#define ADD_LEN	124
+#else
+#define ADD_LEN 100
+#endif /* CONFIG_WFD */
 
 static void wpas_p2p_scan_res_handler(struct wpa_supplicant *wpa_s,
 				      struct wpa_scan_results *scan_res)
@@ -107,8 +118,7 @@ static int wpas_p2p_scan(void *ctx, enum p2p_scan_type type, int freq,
 					num_req_dev_types, req_dev_types);
 	if (wps_ie == NULL)
 		return -1;
-
-	ies = wpabuf_alloc(wpabuf_len(wps_ie) + 100);
+	ies = wpabuf_alloc(wpabuf_len(wps_ie) + ADD_LEN);
 	if (ies == NULL) {
 		wpabuf_free(wps_ie);
 		return -1;
@@ -1169,13 +1179,29 @@ void wpas_dev_found(void *ctx, const u8 *addr,
 	wpa_msg(wpa_s, MSG_INFO, P2P_EVENT_DEVICE_FOUND MACSTR
 		" p2p_dev_addr=" MACSTR
 		" pri_dev_type=%s name='%s' config_methods=0x%x "
-		"dev_capab=0x%x group_capab=0x%x",
+		"dev_capab=0x%x group_capab=0x%x"
+#ifdef CONFIG_WFD
+		" "
+		"wfd=0x%x "
+		"wfd_dev_info=0x%x "
+		"wfd_mng_port=%d "
+		"wfd_max_tp=%d"
+#endif /* CONFIG_WFD */
+		,
 		MAC2STR(addr), MAC2STR(info->p2p_device_addr),
 		wps_dev_type_bin2str(info->pri_dev_type, devtype,
 				     sizeof(devtype)),
 		info->device_name, info->config_methods,
-		info->dev_capab, info->group_capab);
-
+		info->dev_capab, info->group_capab
+#ifdef CONFIG_WFD
+		,
+		info->wfd_ie ? 1 : 0,
+		info->wfd_ie ? info->wfd->device_info_bitmap : 0,
+		info->wfd_ie ? info->wfd->session_mng_port : 0,
+		info->wfd_ie ? info->wfd->maximum_tp : 0
+#endif /* CONFIG_WFD */
+		);
+#
 	wpas_notify_p2p_device_found(ctx, info->p2p_device_addr, new_device);
 }
 
@@ -1256,8 +1282,31 @@ wpas_p2p_service_get_bonjour(struct wpa_supplicant *wpa_s,
 	}
 	return NULL;
 }
+#ifdef CONFIG_WFD
+static struct p2p_srv_wfd *
+wpas_p2p_service_get_wfd(struct wpa_supplicant *wpa_s,
+			     const struct wpabuf *query, int *wfd_info_req)
+{
+	struct p2p_srv_wfd *wsrv;
+	const u8 *query_type, *squery_type;
 
+	query_type = wpabuf_head_u8(query);
+	if (*query_type == WFD_DEVICE_INFO_SUBELEM_ID)
+		*wfd_info_req = 1;
+	else
+		*wfd_info_req = 0;
 
+	/* Compare type value only */
+	dl_list_for_each(wsrv, &wpa_s->global->p2p_srv_wfd,
+			 struct p2p_srv_wfd, list) {
+			query_type = wpabuf_head_u8(query);
+			squery_type = wpabuf_head_u8(wsrv->query);
+			if(*query_type == *squery_type)
+				return wsrv;
+	}
+	return NULL;
+}
+#endif /* CONFIG_WFD */
 static struct p2p_srv_upnp *
 wpas_p2p_service_get_upnp(struct wpa_supplicant *wpa_s, u8 version,
 			  const char *service)
@@ -1291,7 +1340,6 @@ static void wpas_sd_add_proto_not_avail(struct wpabuf *resp, u8 srv_proto,
 	/* Response Data: empty */
 	WPA_PUT_LE16(len_pos, (u8 *) wpabuf_put(resp, 0) - len_pos - 2);
 }
-
 
 static void wpas_sd_all_bonjour(struct wpa_supplicant *wpa_s,
 				struct wpabuf *resp, u8 srv_trans_id)
@@ -1502,7 +1550,105 @@ static void wpas_sd_req_upnp(struct wpa_supplicant *wpa_s,
 
 	WPA_PUT_LE16(len_pos, (u8 *) wpabuf_put(resp, 0) - len_pos - 2);
 }
+#ifdef CONFIG_WFD
+static void wpas_sd_all_wfd(struct wpa_supplicant *wpa_s,
+				struct wpabuf *resp, u8 srv_trans_id)
+{
+	struct p2p_srv_wfd *wsrv;
+	u8 *len_pos;
 
+	wpa_printf(MSG_DEBUG, "P2P: SD Request for all WFD services");
+
+
+	if (dl_list_empty(&wpa_s->global->p2p_srv_wfd)) {
+		wpa_printf(MSG_DEBUG, "P2P: WFD protocol not available");
+		return;
+	}
+	/* TBD update Device Info IE  */
+	dl_list_for_each(wsrv, &wpa_s->global->p2p_srv_wfd,
+			 struct p2p_srv_wfd, list) {
+		if (wpabuf_tailroom(resp) <
+		    5 + wpabuf_len(wsrv->resp))
+			return;
+		/* Length (to be filled) */
+		len_pos = wpabuf_put(resp, 2);
+		wpabuf_put_u8(resp, P2P_SERV_WFD);
+		wpabuf_put_u8(resp, srv_trans_id);
+		/* Status Code */
+		wpabuf_put_u8(resp, P2P_SD_SUCCESS);
+		wpa_hexdump_ascii(MSG_DEBUG, "P2P: Matching WFD service",
+				  wpabuf_head(wsrv->resp),
+				  wpabuf_len(wsrv->resp));
+		/* Response Data */
+		wpabuf_put_buf(resp, wsrv->resp); /* Value */
+		WPA_PUT_LE16(len_pos, (u8 *) wpabuf_put(resp, 0) - len_pos -
+			     2);
+	}
+}
+
+static void wpas_sd_req_wfd(struct wpa_supplicant *wpa_s,
+				struct wpabuf *resp, u8 srv_trans_id,
+				const u8 *query, size_t query_len)
+{
+	struct p2p_srv_wfd *wsrv;
+	struct wpabuf buf;
+	u8 *len_pos;
+	int wfd_info_req = 0;
+
+	wpa_hexdump_ascii(MSG_DEBUG, "P2P: SD Request for WFD",
+			  query, query_len);
+
+	if (dl_list_empty(&wpa_s->global->p2p_srv_wfd)) {
+		wpa_printf(MSG_DEBUG, "P2P: WFD protocol not available");
+		wpas_sd_add_proto_not_avail(resp, P2P_SERV_WFD,
+					    srv_trans_id);
+		return;
+	}
+	if (query_len == 0) {
+		wpas_sd_all_wfd(wpa_s, resp, srv_trans_id);
+		return;
+	}
+
+	if (wpabuf_tailroom(resp) < 5)
+		return;
+	/* Length (to be filled) */
+	len_pos = wpabuf_put(resp, 2);
+	wpabuf_put_u8(resp, P2P_SERV_WFD);
+	wpabuf_put_u8(resp, srv_trans_id);
+
+	wpabuf_set(&buf, query, query_len);
+	wsrv = wpas_p2p_service_get_wfd(wpa_s, &buf, &wfd_info_req);
+	if (wsrv == NULL) {
+		wpa_printf(MSG_DEBUG, "P2P: Requested WFD service not "
+			   "available");
+
+		/* Status Code */
+		wpabuf_put_u8(resp, P2P_SD_REQUESTED_INFO_NOT_AVAILABLE);
+		/* Response Data: empty */
+		WPA_PUT_LE16(len_pos, (u8 *) wpabuf_put(resp, 0) - len_pos -
+			     2);
+		return;
+	}
+
+	/* Status Code */
+	wpabuf_put_u8(resp, P2P_SD_SUCCESS);
+
+	if (wpabuf_tailroom(resp) >=
+	    wpabuf_len(wsrv->query) + wpabuf_len(wsrv->resp)) {
+		/* Response Data */
+		if(!wfd_info_req)
+			wfd_buf_add_device_info(wpa_s->global->wfd, resp);
+		else {
+			/* Update WFD Device Info */
+			wpabuf_head(wsrv->resp);
+			wfd_buf_add_device_info(wpa_s->global->wfd, resp);
+		}
+
+		wpabuf_put_buf(resp, wsrv->resp); /* Value */
+	}
+	WPA_PUT_LE16(len_pos, (u8 *) wpabuf_put(resp, 0) - len_pos - 2);
+}
+#endif /* CONFIG_WFD */
 
 void wpas_sd_request(void *ctx, int freq, const u8 *sa, u8 dialog_token,
 		     u16 update_indic, const u8 *tlvs, size_t tlvs_len)
@@ -1583,6 +1729,9 @@ void wpas_sd_request(void *ctx, int freq, const u8 *sa, u8 dialog_token,
 			}
 			wpas_sd_all_bonjour(wpa_s, resp, srv_trans_id);
 			wpas_sd_all_upnp(wpa_s, resp, srv_trans_id);
+#ifdef CONFIG_WFD
+			wpas_sd_all_wfd(wpa_s, resp, srv_trans_id);
+#endif /* CONFIG_WFD */
 			break;
 		case P2P_SERV_BONJOUR:
 			wpas_sd_req_bonjour(wpa_s, resp, srv_trans_id,
@@ -1592,6 +1741,12 @@ void wpas_sd_request(void *ctx, int freq, const u8 *sa, u8 dialog_token,
 			wpas_sd_req_upnp(wpa_s, resp, srv_trans_id,
 					 pos, tlv_end - pos);
 			break;
+#ifdef CONFIG_WFD
+		case P2P_SERV_WFD:
+			wpas_sd_req_wfd(wpa_s, resp, srv_trans_id,
+							pos, tlv_end - pos);
+			break;
+#endif
 		default:
 			wpa_printf(MSG_DEBUG, "P2P: Unavailable service "
 				   "protocol %u", srv_proto);
@@ -1707,7 +1862,30 @@ void * wpas_p2p_sd_request_upnp(struct wpa_supplicant *wpa_s, const u8 *dst,
 	wpabuf_free(tlvs);
 	return ret;
 }
+#ifdef CONFIG_WFD
+void * wpas_p2p_sd_request_wfd(struct wpa_supplicant *wpa_s, const u8 *dst, const struct wpabuf *tlvs)
+{
+	void *ret;
+	struct wpabuf *tlvs_wfd, *tlvs_res;
 
+	tlvs_wfd = wpabuf_alloc(2 + 1 + 1 + 8 + wpabuf_len(tlvs));
+	if (tlvs_wfd == NULL)
+		return NULL;
+	/* Insert WFD Device Info */
+	wpabuf_put_le16(tlvs_wfd, 1 + 1 + 8 + wpabuf_len(tlvs));
+	wpabuf_put_u8(tlvs_wfd, P2P_SERV_WFD); /* Service Protocol Type */
+	wpabuf_put_u8(tlvs_wfd, 1); /* Service Transaction ID */
+	wfd_buf_add_device_info(wpa_s->global->wfd, tlvs_wfd);
+
+	tlvs_res = wpabuf_concat(tlvs_wfd, tlvs);
+	if (tlvs_res == NULL)
+		return NULL;
+	ret = wpas_p2p_sd_request(wpa_s, dst, tlvs_res);
+	wpabuf_free(tlvs_res);
+
+	return ret;
+}
+#endif /* CONFIG_WFD */
 
 int wpas_p2p_sd_cancel_request(struct wpa_supplicant *wpa_s, void *req)
 {
@@ -1762,11 +1940,20 @@ static void wpas_p2p_srv_upnp_free(struct p2p_srv_upnp *usrv)
 	os_free(usrv);
 }
 
+static void wpas_p2p_srv_wfd_free(struct p2p_srv_wfd *wsrv)
+{
+	dl_list_del(&wsrv->list);
+	wpabuf_free(wsrv->query);
+	wpabuf_free(wsrv->resp);
+	os_free(wsrv);
+}
+
 
 void wpas_p2p_service_flush(struct wpa_supplicant *wpa_s)
 {
 	struct p2p_srv_bonjour *bsrv, *bn;
 	struct p2p_srv_upnp *usrv, *un;
+	struct p2p_srv_wfd *wsrv, *wn;
 
 	dl_list_for_each_safe(bsrv, bn, &wpa_s->global->p2p_srv_bonjour,
 			      struct p2p_srv_bonjour, list)
@@ -1775,6 +1962,10 @@ void wpas_p2p_service_flush(struct wpa_supplicant *wpa_s)
 	dl_list_for_each_safe(usrv, un, &wpa_s->global->p2p_srv_upnp,
 			      struct p2p_srv_upnp, list)
 		wpas_p2p_srv_upnp_free(usrv);
+
+	dl_list_for_each_safe(wsrv, wn, &wpa_s->global->p2p_srv_wfd,
+			      struct p2p_srv_wfd, list)
+		wpas_p2p_srv_wfd_free(wsrv);
 
 	wpas_p2p_sd_service_update(wpa_s);
 }
@@ -1855,6 +2046,47 @@ int wpas_p2p_service_del_upnp(struct wpa_supplicant *wpa_s, u8 version,
 	return 0;
 }
 
+#ifdef CONFIG_WFD
+int wpas_p2p_service_add_wfd(struct wpa_supplicant *wpa_s,
+				 struct wpabuf *query, struct wpabuf *resp)
+{
+	struct p2p_srv_wfd *wsrv;
+	int wfd_info_req = 0;
+
+	wsrv = wpas_p2p_service_get_wfd(wpa_s, query, &wfd_info_req);
+	if (wsrv) {
+		wpabuf_free(query);
+		wpabuf_free(wsrv->resp);
+		wsrv->resp = resp;
+		return 0;
+	}
+
+	wsrv = os_zalloc(sizeof(*wsrv));
+	if (wsrv == NULL)
+		return -1;
+	wsrv->query = query;
+	wsrv->resp = resp;
+	dl_list_add_tail(&wpa_s->global->p2p_srv_wfd, &wsrv->list);
+
+	wpas_p2p_sd_service_update(wpa_s);
+	return 0;
+}
+
+
+int wpas_p2p_service_del_wfd(struct wpa_supplicant *wpa_s,
+				 const struct wpabuf *query)
+{
+	struct p2p_srv_wfd *wsrv;
+	int wfd_info_req = 0;
+
+	wsrv = wpas_p2p_service_get_wfd(wpa_s, query, &wfd_info_req);
+	if (wsrv == NULL)
+		return -1;
+	wpas_p2p_srv_wfd_free(wsrv);
+	wpas_p2p_sd_service_update(wpa_s);
+	return 0;
+}
+#endif /* CONFIG_WFD */
 
 static void wpas_prov_disc_local_display(struct wpa_supplicant *wpa_s,
 					 const u8 *peer, const char *params,
@@ -2485,10 +2717,31 @@ int wpas_p2p_init(struct wpa_global *global, struct wpa_supplicant *wpa_s)
 		p2p_add_wps_vendor_extension(
 			global->p2p, wpa_s->conf->wps_vendor_ext[i]);
 	}
+#ifdef CONFIG_WFD
+	{
+		struct wpabuf *query, *resp;
 
+
+		query = wpabuf_alloc(8);
+		if (query == NULL)
+			return -1;
+		resp = wpabuf_alloc(8);
+		if (resp == NULL)
+			return -1;
+		wfd_buf_add_device_info(wpa_s->global->wfd, query);
+		wfd_buf_add_device_info(wpa_s->global->wfd, resp);
+		return wpas_p2p_service_add_wfd(wpa_s, query, resp);
+	}
+#endif
 	return 0;
 }
 
+#ifdef CONFIG_WFD
+void wpas_p2p_register_wfd(struct wpa_global *global)
+{
+	p2p_register_wfd(global->p2p, global->wfd);
+}
+#endif /* CONFIG_WFD */
 
 /**
  * wpas_p2p_deinit - Deinitialize per-interface P2P data
@@ -2758,7 +3011,7 @@ static void wpas_p2p_join_scan(void *eloop_ctx, void *timeout_ctx)
 		return;
 	}
 
-	ies = wpabuf_alloc(wpabuf_len(wps_ie) + 100);
+	ies = wpabuf_alloc(wpabuf_len(wps_ie) + ADD_LEN);
 	if (ies == NULL) {
 		wpabuf_free(wps_ie);
 		wpas_p2p_scan_res_join(wpa_s, NULL);

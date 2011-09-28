@@ -19,6 +19,7 @@
 #include "wps/wps_defs.h"
 #include "p2p_i.h"
 #include "p2p.h"
+#include "wfd/wfd_i.h"
 
 
 static int p2p_go_det(u8 own_intent, u8 peer_value)
@@ -181,6 +182,13 @@ static struct wpabuf * p2p_build_go_neg_req(struct p2p_data *p2p,
 
 	/* WPS IE with Device Password ID attribute */
 	p2p_build_wps_ie(p2p, buf, p2p_wps_method_pw_id(peer->wps_method), 0);
+#ifdef CONFIG_WFD
+	/*
+	 * According to the Test Plan 4.1.4 add WFD IE
+	 *	to GO negotiation request
+	 */
+	wfd_build_go_neg_req_ie(p2p->wfd, buf);
+#endif /* CONFIG_WFD */
 
 	return buf;
 }

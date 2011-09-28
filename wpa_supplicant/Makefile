@@ -194,6 +194,12 @@ CFLAGS += -DCONFIG_P2P_STRICT
 endif
 endif
 
+ifdef CONFIG_WFD
+OBJS += ../src/wfd/wfd.o
+CFLAGS += -DCONFIG_WFD -I.
+endif
+
+
 ifdef CONFIG_NO_WPA2
 CFLAGS += -DCONFIG_NO_WPA2
 endif

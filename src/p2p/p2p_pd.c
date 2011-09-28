@@ -19,6 +19,7 @@
 #include "wps/wps_defs.h"
 #include "p2p_i.h"
 #include "p2p.h"
+#include "wfd/wfd_i.h"
 
 
 /*
@@ -70,6 +71,9 @@ static struct wpabuf * p2p_build_prov_disc_req(struct p2p_data *p2p,
 
 	/* WPS IE with Config Methods attribute */
 	p2p_build_wps_ie_config_methods(buf, config_methods);
+#ifdef CONFIG_WFD
+	wfd_build_prov_disc_req_ie(p2p->wfd, buf);
+#endif /* CONFIG_WFD */
 
 	return buf;
 }

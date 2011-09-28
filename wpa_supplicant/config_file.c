@@ -684,6 +684,38 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 	if (config->p2p_group_idle)
 		fprintf(f, "p2p_group_idle=%u\n", config->p2p_group_idle);
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+	if (config->wfd_enabled)
+		fprintf(f, "wfd_enabled=%d\n", config->wfd_enabled);
+	if (config->wfd_type)
+		fprintf(f, "wfd_type=%d\n", config->wfd_type);
+	if (config->wfd_coupled_sink_by_source)
+		fprintf(f, "wfd_coupled_sink_by_source=%d\n",
+			config->wfd_coupled_sink_by_source);
+	if (config->wfd_coupled_sink_by_sink)
+		fprintf(f, "wfd_coupled_sink_by_sink=%d\n",
+			config->wfd_coupled_sink_by_sink);
+	if (config->wfd_session_available)
+		fprintf(f, "wfd_session_available=%d\n",
+			config->wfd_session_available);
+	if (config->wfd_service_discovery)
+		fprintf(f, "wfd_service_discovery=%d\n",
+			config->wfd_service_discovery);
+	if (config->wfd_preferred_connectivity)
+		fprintf(f, "wfd_preferred_connectivity=%d\n",
+			config->wfd_preferred_connectivity);
+	if (config->wfd_content_protection)
+		fprintf(f, "wfd_content_protection=%d\n",
+			config->wfd_content_protection);
+	if (config->wfd_time_sync)
+		fprintf(f, "wfd_time_sync=%d\n", config->wfd_time_sync);
+	if (config->wfd_session_mgmt_port)
+		fprintf(f, "wfd_session_mgmt_port=%d\n",
+			config->wfd_session_mgmt_port);
+	if (config->wfd_dev_max_tp)
+		fprintf(f, "wfd_dev_max_tp=%d\n",
+			config->wfd_dev_max_tp);
+#endif /* CONFIG_WFD */
 	if (config->country[0] && config->country[1]) {
 		fprintf(f, "country=%c%c\n",
 			config->country[0], config->country[1]);

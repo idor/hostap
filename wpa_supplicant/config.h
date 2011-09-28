@@ -28,6 +28,7 @@
 #define DEFAULT_BSS_EXPIRATION_AGE 180
 #define DEFAULT_BSS_EXPIRATION_SCAN_COUNT 2
 #define DEFAULT_MAX_NUM_STA 128
+#define DEFAULT_WFD_SESSION_MNGT_PORT	554
 
 #include "config_ssid.h"
 #include "wps/wps.h"
@@ -424,6 +425,21 @@ struct wpa_config {
 	 * disassoc_low_ack - Disassocicate stations with massive packet loss
 	 */
 	int disassoc_low_ack;
+
+	/**
+	 *  Wi-Fi display configuration parameters
+	 */
+	int wfd_enabled;
+	int wfd_type;
+	int wfd_coupled_sink_by_source;
+	int wfd_coupled_sink_by_sink;
+	int wfd_session_available;
+	int wfd_service_discovery;
+	int wfd_preferred_connectivity;
+	int wfd_content_protection;
+	int wfd_time_sync;
+	int wfd_session_mgmt_port;
+	int wfd_dev_max_tp;
 };
 
 

@@ -34,6 +34,7 @@
 #include "ap.h"
 #include "p2p_supplicant.h"
 #include "p2p/p2p.h"
+#include "wfd/wfd_i.h"
 #include "notify.h"
 #include "bss.h"
 #include "scan.h"
@@ -2396,6 +2397,11 @@ static int p2p_ctrl_serv_disc_req(struct wpa_supplicant *wpa_s, char *cmd,
 		ref = (unsigned long) wpas_p2p_sd_request_upnp(wpa_s, dst,
 							       version, pos);
 	} else {
+		int is_wfd = 0;
+		if (os_strncmp(pos, "wfd ", 4) == 0) {
+			pos += 4;
+			is_wfd = 1;
+		}
 		len = os_strlen(pos);
 		if (len & 1)
 			return -1;
@@ -2407,8 +2413,12 @@ static int p2p_ctrl_serv_disc_req(struct wpa_supplicant *wpa_s, char *cmd,
 			wpabuf_free(tlvs);
 			return -1;
 		}
-
-		ref = (unsigned long) wpas_p2p_sd_request(wpa_s, dst, tlvs);
+		if (!is_wfd)
+			ref = (unsigned long) wpas_p2p_sd_request(wpa_s, dst, tlvs);
+#ifdef CONFIG_WFD
+		else
+			ref = (unsigned long) wpas_p2p_sd_request_wfd(wpa_s, dst, tlvs);
+#endif /* CONFIG_WFD */
 		wpabuf_free(tlvs);
 	}
 	res = os_snprintf(buf, buflen, "%llx", (long long unsigned) ref);
@@ -2551,7 +2561,56 @@ static int p2p_ctrl_service_add_upnp(struct wpa_supplicant *wpa_s, char *cmd)
 
 	return wpas_p2p_service_add_upnp(wpa_s, version, pos);
 }
+#ifdef CONFIG_WFD
+static int p2p_ctrl_service_add_wfd(struct wpa_supplicant *wpa_s,
+					char *cmd)
+{
+	char *pos;
+	size_t len;
+	struct wpabuf *query, *resp;
 
+	pos = os_strchr(cmd, ' ');
+	if (pos == NULL)
+		return -1;
+	*pos++ = '\0';
+
+	len = os_strlen(cmd);
+	if (len & 1)
+		return -1;
+	len /= 2;
+	query = wpabuf_alloc(len);
+	if (query == NULL)
+		return -1;
+	if (hexstr2bin(cmd, wpabuf_put(query, len), len) < 0) {
+		wpabuf_free(query);
+		return -1;
+	}
+
+	len = os_strlen(pos);
+	if (len & 1) {
+		wpabuf_free(query);
+		return -1;
+	}
+	len /= 2;
+	resp = wpabuf_alloc(len);
+	if (resp == NULL) {
+		wpabuf_free(query);
+		return -1;
+	}
+	if (hexstr2bin(pos, wpabuf_put(resp, len), len) < 0) {
+		wpabuf_free(query);
+		wpabuf_free(resp);
+		return -1;
+	}
+
+	if (wpas_p2p_service_add_wfd(wpa_s, query, resp) < 0) {
+		wpabuf_free(query);
+		wpabuf_free(resp);
+		return -1;
+	}
+	return 0;
+}
+#endif /* CONFIG_WFD */
 
 static int p2p_ctrl_service_add(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -2566,6 +2625,10 @@ static int p2p_ctrl_service_add(struct wpa_supplicant *wpa_s, char *cmd)
 		return p2p_ctrl_service_add_bonjour(wpa_s, pos);
 	if (os_strcmp(cmd, "upnp") == 0)
 		return p2p_ctrl_service_add_upnp(wpa_s, pos);
+#ifdef CONFIG_WFD
+	if (os_strcmp(cmd, "wfd") == 0)
+		return p2p_ctrl_service_add_wfd(wpa_s, pos);
+#endif /* CONFIG_WFD */
 	wpa_printf(MSG_DEBUG, "Unknown service '%s'", cmd);
 	return -1;
 }
@@ -2612,6 +2675,31 @@ static int p2p_ctrl_service_del_upnp(struct wpa_supplicant *wpa_s, char *cmd)
 	return wpas_p2p_service_del_upnp(wpa_s, version, pos);
 }
 
+#ifdef CONFIG_WFD
+static int p2p_ctrl_service_del_wfd(struct wpa_supplicant *wpa_s,
+					char *cmd)
+{
+	size_t len;
+	struct wpabuf *query;
+	int ret;
+
+	len = os_strlen(cmd);
+	if (len & 1)
+		return -1;
+	len /= 2;
+	query = wpabuf_alloc(len);
+	if (query == NULL)
+		return -1;
+	if (hexstr2bin(cmd, wpabuf_put(query, len), len) < 0) {
+		wpabuf_free(query);
+		return -1;
+	}
+
+	ret = wpas_p2p_service_del_wfd(wpa_s, query);
+	wpabuf_free(query);
+	return ret;
+}
+#endif /* CONFIG_WFD */
 
 static int p2p_ctrl_service_del(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -2626,6 +2714,10 @@ static int p2p_ctrl_service_del(struct wpa_supplicant *wpa_s, char *cmd)
 		return p2p_ctrl_service_del_bonjour(wpa_s, pos);
 	if (os_strcmp(cmd, "upnp") == 0)
 		return p2p_ctrl_service_del_upnp(wpa_s, pos);
+#ifdef CONFIG_WFD
+	if (os_strcmp(cmd, "wfd") == 0)
+		return p2p_ctrl_service_del_wfd(wpa_s, pos);
+#endif /* CONFIG_WFD */
 	wpa_printf(MSG_DEBUG, "Unknown service '%s'", cmd);
 	return -1;
 }
@@ -2984,7 +3076,113 @@ static int p2p_ctrl_ext_listen(struct wpa_supplicant *wpa_s, char *cmd)
 }
 
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WFD
+static int wfd_ctrl_set(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	char *param;
 
+	if (wpa_s->global->wfd == NULL)
+		return -1;
+
+	param = os_strchr(cmd, ' ');
+	if (param == NULL)
+		return -1;
+	*param++ = '\0';
+
+	if (os_strcmp(cmd, "type") == 0) {
+		wfd_set_type(wpa_s->global->wfd, atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "coupled_sink_by_source") == 0) {
+		wfd_set_coupled_sink_by_source(wpa_s->global->wfd,
+						atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "coupled_sink_by_sink") == 0) {
+		wfd_set_coupled_sink_by_sink(wpa_s->global->wfd,
+					atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "session_available") == 0) {
+		wfd_set_session_available(wpa_s->global->wfd,
+				atoi(param), wpa_s);
+		return 0;
+	}
+
+
+	if (os_strcmp(cmd, "service_discovery") == 0) {
+		wfd_set_service_discovery(wpa_s->global->wfd,
+					atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "preferred_connectivity") == 0) {
+		wfd_set_preferred_connectivity(wpa_s->global->wfd,
+						atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "content_protection") == 0) {
+		wfd_set_content_protection(wpa_s->global->wfd,
+						atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "time_sync") == 0) {
+		wfd_set_time_sync(wpa_s->global->wfd,
+					atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "time_sync") == 0) {
+		wfd_set_time_sync(wpa_s->global->wfd,
+					atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "session_mgmt_port") == 0) {
+		wfd_set_session_mgmt_port(wpa_s->global->wfd,
+						atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "dev_max_tp") == 0) {
+		wfd_set_dev_max_tp(wpa_s->global->wfd, atoi(param), wpa_s);
+		return 0;
+	}
+
+	if (os_strcmp(cmd, "enabled") == 0) {
+		wpa_s->global->wfd_enabled = atoi(param);
+		wpa_printf(MSG_DEBUG, "WFD functionality %s",
+			wpa_s->global->wfd_enabled ? "enabled" : "disabled");
+		wfd_set_enabled(wpa_s->global->wfd, atoi(param));
+		return 0;
+	}
+
+	return -1;
+}
+
+static int wfd_ctrl_get(struct wpa_supplicant *wpa_s,
+				char *cmd, char *reply, size_t reply_size)
+{
+
+	if (wpa_s->global->wfd == NULL)
+		return -1;
+
+	if (os_strcmp(cmd, "show") == 0) {
+		return wfd_get_show_param(wpa_s->global->wfd,
+						reply, reply_size);
+	}
+	if (os_strcmp(cmd, "dev_info") == 0) {
+		return wfd_get_dev_info(wpa_s->global->wfd,
+						reply, reply_size);
+	}
+	return -1;
+}
+#endif /* CONFIG_WFD */
 
 static int wpa_supplicant_ctrl_iface_sta_autoconnect(
 	struct wpa_supplicant *wpa_s, char *cmd)
@@ -3430,6 +3628,14 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "SIGNAL_POLL", 11) == 0) {
 		reply_len = wpa_supplicant_signal_poll(wpa_s, reply,
 						       reply_size);
+#ifdef CONFIG_WFD
+	} else if (os_strncmp(buf, "WFD_SET ", 8) == 0) {
+		if (wfd_ctrl_set(wpa_s, buf + 8) < 0)
+			reply_len = -1;
+	} else if (os_strncmp(buf, "WFD_GET ", 8) == 0) {
+			reply_len = wfd_ctrl_get(wpa_s,
+					buf + 8, reply, reply_size);
+#endif /* CONFIG_WFD */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
