@@ -740,7 +740,10 @@ struct wpa_driver_capa {
 	int max_scan_ssids;
 	int max_sched_scan_ssids;
 	int sched_scan_supported;
+<<<<<<< HEAD
 	int max_match_sets;
+=======
+>>>>>>> wpa_s: check if sched_scan is supported before using it
 
 	/**
 	 * max_remain_on_chan - Maximum remain-on-channel duration in msec
@@ -2925,7 +2928,6 @@ enum wpa_event_type {
 	 */
 	EVENT_IBSS_PEER_LOST,
 
-<<<<<<< HEAD
 	/**
 	 * EVENT_DRIVER_GTK_REKEY - Device/driver did GTK rekey
 	 *
@@ -2940,9 +2942,6 @@ enum wpa_event_type {
 	 * EVENT_SCHED_SCAN_STOPPED - Scheduled scan was stopped
 	 */
 	EVENT_SCHED_SCAN_STOPPED
-=======
-	EVENT_SCHED_SCAN_STOPPED,
->>>>>>> wpa_s: add scheduled scan driver operations
 };
 
 
