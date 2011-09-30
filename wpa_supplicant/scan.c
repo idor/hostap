@@ -613,6 +613,9 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	int use_wildcard = 0;
 	int max_sched_scan_ssids;
 
+	if (!wpa_s->sched_scan_supported)
+		return -EOPNOTSUPP;
+
 	if (wpa_s->max_sched_scan_ssids > WPAS_MAX_SCAN_SSIDS)
 		max_sched_scan_ssids = WPAS_MAX_SCAN_SSIDS;
 	else
