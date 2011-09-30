@@ -2761,6 +2761,7 @@ static int wpa_driver_nl80211_sched_scan(void *priv,
 
 	msg = NULL;
 	if (ret) {
+<<<<<<< HEAD
 		wpa_printf(MSG_DEBUG, "nl80211: Sched scan start failed: "
 			   "ret=%d (%s)", ret, strerror(-ret));
 		goto nla_put_failure;
@@ -2768,6 +2769,15 @@ static int wpa_driver_nl80211_sched_scan(void *priv,
 
 	wpa_printf(MSG_DEBUG, "nl80211: Sched scan requested (ret=%d) - "
 		   "scan interval %d msec", ret, interval);
+=======
+		wpa_printf(MSG_DEBUG, "nl80211: sched scan start failed: ret=%d "
+			   "(%s)", ret, strerror(-ret));
+		goto nla_put_failure;
+	}
+
+	wpa_printf(MSG_DEBUG, "nl80211: Sched scan requested (ret=%d) - scan interval %d "
+		   "msec", ret, interval);
+>>>>>>> nl80211: add scheduled scan support
 
 nla_put_failure:
 	nlmsg_free(ssids);
@@ -2776,7 +2786,10 @@ nla_put_failure:
 	return ret;
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> nl80211: add scheduled scan support
 /**
  * wpa_driver_nl80211_stop_sched_scan - Stop a scheduled scan
  * @priv: Pointer to private driver data from wpa_driver_nl80211_init()
