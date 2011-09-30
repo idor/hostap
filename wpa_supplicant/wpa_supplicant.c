@@ -2106,6 +2106,7 @@ static struct wpa_supplicant * wpa_supplicant_alloc(void)
 	wpa_s->scan_interval = 5;
 	wpa_s->new_connection = 1;
 	wpa_s->parent = wpa_s;
+	wpa_s->sched_scanning = 0;
 
 	return wpa_s;
 }
@@ -2270,6 +2271,7 @@ next_driver:
 				return -1;
 		}
 		wpa_s->max_scan_ssids = capa.max_scan_ssids;
+		wpa_s->max_sched_scan_ssids = capa.max_sched_scan_ssids;
 		wpa_s->max_remain_on_chan = capa.max_remain_on_chan;
 		wpa_s->max_stations = capa.max_stations;
 	}
