@@ -1165,6 +1165,7 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 			wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
 		os_memset(wpa_s->pending_bssid, 0, ETH_ALEN);
 	}
+	wpa_supplicant_cancel_sched_scan(wpa_s);
 	wpa_supplicant_cancel_scan(wpa_s);
 
 	/* Starting new association, so clear the possibly used WPA IE from the
@@ -2079,7 +2080,10 @@ int wpa_supplicant_driver_init(struct wpa_supplicant *wpa_s)
 
 	wpa_s->prev_scan_ssid = WILDCARD_SSID_SCAN;
 	if (wpa_supplicant_enabled_networks(wpa_s->conf)) {
-		wpa_supplicant_req_scan(wpa_s, interface_count, 100000);
+		int ret;
+		ret = wpa_supplicant_req_sched_scan(wpa_s);
+		if (ret)
+			wpa_supplicant_req_scan(wpa_s, interface_count, 100000);
 		interface_count++;
 	} else
 		wpa_supplicant_set_state(wpa_s, WPA_INACTIVE);
