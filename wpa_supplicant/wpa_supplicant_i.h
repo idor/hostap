@@ -427,6 +427,7 @@ struct wpa_supplicant {
 	unsigned int drv_flags;
 	int max_scan_ssids;
 	int max_sched_scan_ssids;
+	int sched_scan_supported;
 	unsigned int max_remain_on_chan;
 	unsigned int max_stations;
 
