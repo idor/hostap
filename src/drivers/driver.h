@@ -195,7 +195,7 @@ struct wpa_interface_info {
 	const char *drv_name;
 };
 
-#define WPAS_MAX_SCAN_SSIDS 4
+#define WPAS_MAX_SCAN_SSIDS 10
 
 /**
  * struct wpa_driver_scan_params - Scan parameters
@@ -581,6 +581,7 @@ struct wpa_driver_capa {
 	unsigned int flags;
 
 	int max_scan_ssids;
+	int max_sched_scan_ssids;
 
 	/**
 	 * max_remain_on_chan - Maximum remain-on-channel duration in msec
@@ -1285,6 +1286,37 @@ struct wpa_driver_ops {
 	 * results with wpa_driver_get_scan_results2().
 	 */
 	int (*scan2)(void *priv, struct wpa_driver_scan_params *params);
+
+	/**
+	 * sched_scan - Request the driver to initiate scheduled scan
+	 * @priv: private driver interface data
+	 * @params: Scan parameters
+	 * @interval: interval between scan cycles
+	 *
+	 * Returns: 0 on success, -1 on failure
+	 *
+	 * This operation should be used for scheduled scan offload to
+	 * the hardware.  Every time scan results are available, the
+	 * driver should report scan results event for wpa_supplicant
+	 * which will eventually request the results with
+	 * wpa_driver_get_scan_results2().  This operation is optional
+	 * and if not provided or if it returns -1, we fall back to
+	 * normal host-scheduled scans.
+	 */
+	int (*sched_scan)(void *priv, struct wpa_driver_scan_params *params,
+			  u32 interval);
+
+	/**
+	 * stop_sched_scan - Request the driver to stop a scheduled scan
+	 * @priv: private driver interface data
+	 *
+	 * Returns: 0 on success, -1 on failure
+	 *
+	 * This should cause the scheduled scan to be stopped and
+	 * results should stop being sent.  Must be supported if
+	 * sched_scan is supported.
+	 */
+	int (*stop_sched_scan)(void *priv);
 
 	/**
 	 * authenticate - Request driver to authenticate
@@ -2674,7 +2706,9 @@ enum wpa_event_type {
 	/**
 	 * EVENT_IBSS_PEER_LOST - IBSS peer not reachable anymore
 	 */
-	EVENT_IBSS_PEER_LOST
+	EVENT_IBSS_PEER_LOST,
+
+	EVENT_SCHED_SCAN_STOPPED,
 };
 
 
