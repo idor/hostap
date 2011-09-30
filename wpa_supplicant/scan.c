@@ -350,43 +350,33 @@ static void wpa_supplicant_optimize_freqs(
 		wpa_s->after_wps--;
 	}
 
-#endif /* CONFIG_WPS */
-}
+	wps = wpas_wps_in_use(wpa_s, &req_type);
 
+	if (wps) {
+		wps_ie = wps_build_probe_req_ie(wps == 2, &wpa_s->wps->dev,
+						wpa_s->wps->uuid, req_type,
+						0, NULL);
+		if (wps_ie) {
+			params->extra_ies = wpabuf_head(wps_ie);
+			params->extra_ies_len = wpabuf_len(wps_ie);
+		}
+	}
 
-#ifdef CONFIG_INTERWORKING
-static void wpas_add_interworking_elements(struct wpa_supplicant *wpa_s,
-					   struct wpabuf *buf)
-{
-	if (wpa_s->conf->interworking == 0)
-		return;
+#ifdef CONFIG_P2P
+#ifdef CONFIG_WFD
+#define ADD_LEN        124
+#else
+#define ADD_LEN        100
+#endif
+	if (wps_ie) {
+		if (wpabuf_resize(&wps_ie, ADD_LEN) == 0) {
+			wpas_p2p_scan_ie(wpa_s, wps_ie);
+			params->extra_ies = wpabuf_head(wps_ie);
+			params->extra_ies_len = wpabuf_len(wps_ie);
+		}
+	}
+#endif /* CONFIG_P2P */
 
-	wpabuf_put_u8(buf, WLAN_EID_EXT_CAPAB);
-	wpabuf_put_u8(buf, 4);
-	wpabuf_put_u8(buf, 0x00);
-	wpabuf_put_u8(buf, 0x00);
-	wpabuf_put_u8(buf, 0x00);
-	wpabuf_put_u8(buf, 0x80); /* Bit 31 - Interworking */
-
-	wpabuf_put_u8(buf, WLAN_EID_INTERWORKING);
-	wpabuf_put_u8(buf, is_zero_ether_addr(wpa_s->conf->hessid) ? 1 :
-		      1 + ETH_ALEN);
-	wpabuf_put_u8(buf, INTERWORKING_ANT_WILDCARD);
-	/* No Venue Info */
-	if (!is_zero_ether_addr(wpa_s->conf->hessid))
-		wpabuf_put_data(buf, wpa_s->conf->hessid, ETH_ALEN);
-}
-#endif /* CONFIG_INTERWORKING */
-
-
-static struct wpabuf *
-wpa_supplicant_extra_ies(struct wpa_supplicant *wpa_s,
-			 struct wpa_driver_scan_params *params)
-{
-	struct wpabuf *extra_ie = NULL;
-#ifdef CONFIG_WPS
-	int wps = 0;
-	enum wps_request_type req_type = WPS_REQ_ENROLLEE_INFO;
 #endif /* CONFIG_WPS */
 
 #ifdef CONFIG_INTERWORKING
