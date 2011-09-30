@@ -740,10 +740,7 @@ struct wpa_driver_capa {
 	int max_scan_ssids;
 	int max_sched_scan_ssids;
 	int sched_scan_supported;
-<<<<<<< HEAD
 	int max_match_sets;
-=======
->>>>>>> wpa_s: check if sched_scan is supported before using it
 
 	/**
 	 * max_remain_on_chan - Maximum remain-on-channel duration in msec
