@@ -429,6 +429,7 @@ struct wpa_supplicant {
 	int max_scan_ssids;
 	int max_sched_scan_ssids;
 	int sched_scan_supported;
+	int max_match_sets;
 	unsigned int max_remain_on_chan;
 	unsigned int max_stations;
 
