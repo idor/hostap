@@ -1570,6 +1570,7 @@ struct wiphy_info_data {
 	int connect_supported;
 	int offchan_tx_supported;
 	int max_remain_on_chan;
+	int sched_scan_supported;
 };
 
 
@@ -1623,6 +1624,8 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 				info->auth_supported = 1;
 			else if (cmd == NL80211_CMD_CONNECT)
 				info->connect_supported = 1;
+			else if (cmd == NL80211_CMD_START_SCHED_SCAN)
+				info->sched_scan_supported = 1;
 		}
 	}
 
@@ -1686,6 +1689,8 @@ static int wpa_driver_nl80211_capa(struct wpa_driver_nl80211_data *drv)
 
 	drv->capa.max_scan_ssids = info.max_scan_ssids;
 	drv->capa.max_sched_scan_ssids = info.max_sched_scan_ssids;
+	drv->capa.sched_scan_supported = info.sched_scan_supported;
+
 	if (info.ap_supported)
 		drv->capa.flags |= WPA_DRIVER_FLAGS_AP;
 
