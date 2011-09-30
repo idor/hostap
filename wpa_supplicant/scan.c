@@ -629,6 +629,7 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	struct wpa_driver_scan_params params;
 	enum wpa_states prev_state;
 	struct wpa_ssid *ssid;
+	struct wpabuf *wps_ie = NULL;
 	int ret;
 	int max_sched_scan_ssids;
 
@@ -639,8 +640,6 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 		max_sched_scan_ssids = WPAS_MAX_SCAN_SSIDS;
 	else
 		max_sched_scan_ssids = wpa_s->max_sched_scan_ssids;
-
-	/* TODO: Add WPS and P2P support */
 
 	if (wpa_s->sched_scanning)
 		return 0;
@@ -716,12 +715,17 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 		return 0;
 	}
 
+	if (wpa_s->wps)
+		wps_ie = wpa_supplicant_extra_ies(wpa_s, &params);
+
 	wpa_dbg(wpa_s, MSG_DEBUG, "Starting sched scan: interval %d timeout %d",
 		wpa_s->sched_scan_interval, wpa_s->sched_scan_timeout);
 
 	ret = wpa_supplicant_start_sched_scan(wpa_s, &params,
 					      wpa_s->sched_scan_interval);
+	wpabuf_free(wps_ie);
 	os_free(params.filter_ssids);
+
 	if (ret) {
 		wpa_msg(wpa_s, MSG_WARNING, "Failed to initiate sched scan");
 		if (prev_state != wpa_s->wpa_state)
