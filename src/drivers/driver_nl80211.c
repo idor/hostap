@@ -7352,8 +7352,12 @@ static const char * nl80211_get_radio_name(void *priv)
 }
 
 
-static int nl80211_pmkid(struct i802_bss *bss, int cmd, const u8 *bssid,
-			 const u8 *pmkid)
+#ifdef ANDROID
+/* we start with "auto" power mode - power_save is on */
+static int g_power_mode = 0;
+
+static int nl80211_set_power_save(struct wpa_driver_nl80211_data *drv,
+			      enum nl80211_ps_state ps_state)
 {
 	struct nl_msg *msg;
 
@@ -7361,22 +7365,20 @@ static int nl80211_pmkid(struct i802_bss *bss, int cmd, const u8 *bssid,
 	if (!msg)
 		return -ENOMEM;
 
-	genlmsg_put(msg, 0, 0, genl_family_get_id(bss->drv->nl80211), 0, 0,
-		    cmd, 0);
+	genlmsg_put(msg, 0, 0, genl_family_get_id(drv->nl80211), 0,
+		    0, NL80211_CMD_SET_POWER_SAVE, 0);
 
-	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, if_nametoindex(bss->ifname));
-	if (pmkid)
-		NLA_PUT(msg, NL80211_ATTR_PMKID, 16, pmkid);
-	if (bssid)
-		NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, bssid);
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, drv->ifindex);
+	NLA_PUT_U32(msg, NL80211_ATTR_PS_STATE, ps_state);
 
-	return send_and_recv_msgs(bss->drv, msg, NULL, NULL);
+	return send_and_recv_msgs(drv, msg, NULL, NULL);
  nla_put_failure:
+	nlmsg_free(msg);
 	return -ENOBUFS;
 }
 
 
-static int nl80211_add_pmkid(void *priv, const u8 *bssid, const u8 *pmkid)
+static int nl80211_toggle_rx_filter(char state)
 {
 	struct i802_bss *bss = priv;
 	wpa_printf(MSG_DEBUG, "nl80211: Add PMKID for " MACSTR, MAC2STR(bssid));
@@ -7384,7 +7386,7 @@ static int nl80211_add_pmkid(void *priv, const u8 *bssid, const u8 *pmkid)
 }
 
 
-static int nl80211_remove_pmkid(void *priv, const u8 *bssid, const u8 *pmkid)
+static int nl80211_priv_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len )
 {
 	struct i802_bss *bss = priv;
 	wpa_printf(MSG_DEBUG, "nl80211: Delete PMKID for " MACSTR,
@@ -7416,11 +7418,28 @@ static void nl80211_set_rekey_info(void *priv, const u8 *kek, const u8 *kck,
 	genlmsg_put(msg, 0, 0, genl_family_get_id(drv->nl80211), 0, 0,
 		    NL80211_CMD_SET_REKEY_OFFLOAD, 0);
 
-	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, bss->ifindex);
+		ret = nl80211_get_link_signal(drv, &sig);
+		if (ret == 0) {
+			linkspeed = sig.current_txrate;
+			ret = os_snprintf(buf, buf_len, "LinkSpeed %d\n", linkspeed);
+		}
+	} else if( os_strcasecmp(cmd, "RELOAD") == 0 ) {
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+#if 0 /* Not implemented yet */
+	} else if( os_strcasecmp(cmd, "SCAN-PASSIVE") == 0 ) {
+		g_scan_type = IW_SCAN_TYPE_PASSIVE;
+		ret = 0;
+	} else if( os_strcasecmp(cmd, "SCAN-ACTIVE") == 0 ) {
+		g_scan_type = IW_SCAN_TYPE_ACTIVE;
+		ret = 0;
+	} else if( os_strcasecmp(cmd, "SCAN-MODE") == 0 ) {
+		ret = snprintf(buf, buf_len, "ScanMode = %u\n", g_scan_type);
+		if (ret < (int)buf_len)
+			return ret;
+	} else if( os_strncasecmp(cmd, "BTCOEXMODE", 10) == 0 ) {
+		int mode = atoi(cmd + 10);
 
-	replay_nested = nla_nest_start(msg, NL80211_ATTR_REKEY_DATA);
-	if (!replay_nested)
-		goto nla_put_failure;
+		wpa_printf(MSG_DEBUG, "will change btcoex mode to: %d", mode);
 
 	NLA_PUT(msg, NL80211_REKEY_DATA_KEK, NL80211_KEK_LEN, kek);
 	NLA_PUT(msg, NL80211_REKEY_DATA_KCK, NL80211_KCK_LEN, kck);
