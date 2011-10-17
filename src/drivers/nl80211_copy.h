@@ -495,6 +495,7 @@
  *	more background information, see
  *	http://wireless.kernel.org/en/users/Documentation/WoWLAN.
  *
+
  * @NL80211_CMD_SET_REKEY_OFFLOAD: This command is used give the driver
  *	the necessary information for supporting GTK rekey offload. This
  *	feature is typically used during WoWLAN. The configuration data
@@ -508,6 +509,19 @@
  *
  * @NL80211_CMD_TDLS_OPER: Perform a high-level TDLS command (e.g. link setup).
  * @NL80211_CMD_TDLS_MGMT: Send a TDLS management frame.
+
+ * @NL80211_CMD_SCAN_CANCEL: Stop currently running scan (both sw and hw).
+ *	This operation will eventually invoke %NL80211_CMD_SCAN_ABORTED
+ *	event, partial scan results will be available. Returns -ENOENT
+ *	if scan is not running.
+ *
+ * @NL80211_CMD_IM_SCAN_RESULT: Intermediate scan result notification event,
+ *	this event could be enabled with @NL80211_ATTR_IM_SCAN_RESULT
+ *	flag during @NL80211_CMD_TRIGGER_SCAN. This event contains
+ *	%NL80211_BSS_BSSID which is used to specify the BSSID of received
+ *	scan result and %NL80211_BSS_SIGNAL_MBM to indicate signal strength.
+ *	On reception of this notification, userspace may decide to stop earlier
+ *	currently running scan with (@NL80211_CMD_SCAN_CANCEL).
  *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
@@ -637,6 +651,10 @@ enum nl80211_commands {
 
 	NL80211_CMD_TDLS_OPER,
 	NL80211_CMD_TDLS_MGMT,
+
+	NL80211_CMD_SCAN_CANCEL,
+
+	NL80211_CMD_IM_SCAN_RESULT,
 
 	/* add new commands above here */
 
@@ -1109,6 +1127,34 @@ enum nl80211_commands {
  *	%NL80211_CMD_TDLS_MGMT. Otherwise %NL80211_CMD_TDLS_OPER should be
  *	used for asking the driver to perform a TDLS operation.
  *
+ * @%NL80211_ATTR_IM_SCAN_RESULT: Flag attribute to enable intermediate
+ *	scan result notification event (%NL80211_CMD_IM_SCAN_RESULT)
+ *	for the %NL80211_CMD_TRIGGER_SCAN command.
+ *	When set: will notify on each new scan result in the cache.
+ * @%NL80211_ATTR_IM_SCAN_RESULT_MIN_RSSI: Intermediate event filtering.
+ *	When set: will notify only those new scan result whose signal
+ *	strength of probe response/beacon (in dBm) is stronger than this
+ *	negative value (usually: -20 dBm > X > -95 dBm).
+ *
+ * @%NL80211_ATTR_CAPABILITIES: Flags (u32) attribute to expose device
+ *	capabilities flags which defined in nl80211_device_capabilities.
+ *
+ * @%NL80211_ATTR_SCAN_MIN_DWELL: Minimum scan dwell time (in TUs), u32
+ *	attribute to setup minimum time to wait on each channel, if received
+ *	at least one probe response during this period will continue waiting
+ *	%NL80211_ATTR_SCAN_MAX_DWELL, otherwise will move to next channel.
+ *	Relevant only for active scan, used with %NL80211_CMD_TRIGGER_SCAN
+ *	command. This is optional attribute, so if it's not set driver should
+ *	use hardware default values.
+ * @%NL80211_ATTR_SCAN_MAX_DWELL: Maximum scan dwell time (in TUs), u32
+ *	attribute to setup maximum time to wait on each channel.
+ *	Relevant only for active scan, used with %NL80211_CMD_TRIGGER_SCAN
+ *	command. This is optional attribute, so if it's not set driver should
+ *	use hardware default values.
+ * @%NL80211_ATTR_SCAN_NUM_PROBE:  Attribute (u8) to setup number of probe
+ *	requests to transmit on each active scan channel, used with
+ *	%NL80211_CMD_TRIGGER_SCAN command.
+ *
  * @NL80211_ATTR_SCAN_SUPP_RATES: rates per to be advertised as supported in scan,
  *	nested array attribute containing an entry for each band, with the entry
  *	being a list of supported rates as defined by IEEE 802.11 7.3.2.2 but
@@ -1120,6 +1166,8 @@ enum nl80211_commands {
  *	applications use this attribute.
  *	This attribute is used with %NL80211_CMD_TRIGGER_SCAN and
  *	%NL80211_CMD_FRAME commands.
+ *
+ * @NL80211_ATTR_PROBE_RESP: Probe Response template data
  *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -1321,6 +1369,9 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_REKEY_DATA,
 
+	/* FIXME: just do it here now, because I want to keep the
+	   changes in my hostap.  This must be moved below
+	   NL80211_ATTR_SCAN_NUM_PROBE */
 	NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS,
 	NL80211_ATTR_MAX_SCHED_SCAN_IE_LEN,
 
@@ -1348,6 +1399,19 @@ enum nl80211_attrs {
 	NL80211_ATTR_TDLS_OPERATION,
 	NL80211_ATTR_TDLS_SUPPORT,
 	NL80211_ATTR_TDLS_EXTERNAL_SETUP,
+
+	NL80211_ATTR_IM_SCAN_RESULT,
+	NL80211_ATTR_IM_SCAN_RESULT_MIN_RSSI,
+
+	NL80211_ATTR_CAPABILITIES,
+
+	NL80211_ATTR_SCAN_MIN_DWELL,
+	NL80211_ATTR_SCAN_MAX_DWELL,
+	NL80211_ATTR_SCAN_NUM_PROBE,
+
+	NL80211_ATTR_SCAN_SUPP_RATES,
+
+	NL80211_ATTR_PROBE_RESP,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -2622,6 +2686,7 @@ enum nl80211_sta_wme_attr {
 };
 
 /**
+<<<<<<< HEAD
  * enum nl80211_pmksa_candidate_attr - attributes for PMKSA caching candidates
  * @__NL80211_PMKSA_CANDIDATE_INVALID: invalid number for nested attributes
  * @NL80211_PMKSA_CANDIDATE_INDEX: candidate index (u32; the smaller, the higher
@@ -2659,5 +2724,23 @@ enum nl80211_tdls_operation {
 	NL80211_TDLS_ENABLE_LINK,
 	NL80211_TDLS_DISABLE_LINK,
 };
+=======
+ * enum nl80211_device_capabilities - device capabilities flags.
+ * @NL80211_DEV_CAPA_SUPPORTS_CANCEL_SCAN: device supports cancel scan command.
+ * @NL80211_DEV_CAPA_SUPPORTS_IM_SCAN_EVENT: device supports intermediate scan
+ * events.
+ */
+enum nl80211_device_capabilities {
+	NL80211_DEV_CAPA_SUPPORTS_CANCEL_SCAN	= (1<<0),
+	NL80211_DEV_CAPA_SUPPORTS_IM_SCAN_EVENT	= (1<<1),
+
+	/* add new flags above here */
+
+	/* keep last */
+	NUM_NL80211_DEV_CAPA,
+	MAX_NL80211_DEV_CAPA = NUM_NL80211_DEV_CAPA - 1
+};
+
+>>>>>>> nl80211: update nl80211_copy.h to add support for WPL
 
 #endif /* __LINUX_NL80211_H */
