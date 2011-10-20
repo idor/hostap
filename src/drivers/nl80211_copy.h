@@ -2686,7 +2686,6 @@ enum nl80211_sta_wme_attr {
 };
 
 /**
-<<<<<<< HEAD
  * enum nl80211_pmksa_candidate_attr - attributes for PMKSA caching candidates
  * @__NL80211_PMKSA_CANDIDATE_INVALID: invalid number for nested attributes
  * @NL80211_PMKSA_CANDIDATE_INDEX: candidate index (u32; the smaller, the higher
@@ -2724,7 +2723,8 @@ enum nl80211_tdls_operation {
 	NL80211_TDLS_ENABLE_LINK,
 	NL80211_TDLS_DISABLE_LINK,
 };
-=======
+
+/**
  * enum nl80211_device_capabilities - device capabilities flags.
  * @NL80211_DEV_CAPA_SUPPORTS_CANCEL_SCAN: device supports cancel scan command.
  * @NL80211_DEV_CAPA_SUPPORTS_IM_SCAN_EVENT: device supports intermediate scan
@@ -2740,7 +2740,5 @@ enum nl80211_device_capabilities {
 	NUM_NL80211_DEV_CAPA,
 	MAX_NL80211_DEV_CAPA = NUM_NL80211_DEV_CAPA - 1
 };
-
->>>>>>> nl80211: update nl80211_copy.h to add support for WPL
 
 #endif /* __LINUX_NL80211_H */
