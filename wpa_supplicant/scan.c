@@ -716,6 +716,11 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 		ssid = ssid->next;
 	}
 
+	/* In case no SSIDs for active scan add wildcard SSID to trigger
+	   broadcast probe request */
+	if (!params.num_ssids)
+		params.num_ssids++;
+
 	if (wpa_s->wps)
 		wps_ie = wpa_supplicant_extra_ies(wpa_s, &params);
 
