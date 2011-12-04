@@ -632,6 +632,12 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	if (!wpa_s->sched_scan_supported)
 		return -EOPNOTSUPP;
 
+	if (wpas_wps_in_progress(wpa_s)) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"WPS in progress. Falling back to normal scan");
+		return -EBUSY;
+	}
+
 	if (wpa_s->sched_scanning) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Cancel previous sched scan");
 		wpa_supplicant_cancel_sched_scan(wpa_s);
@@ -728,7 +734,6 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 
 	if (ret)
 		return ret;
-
 
 	/* If we have more SSIDs to scan, add a timeout so we scan them too */
 	if (ssid || !wpa_s->first_sched_scan) {
