@@ -2206,7 +2206,6 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		break;
 	case EVENT_SCHED_SCAN_STOPPED:
 		wpa_s->sched_scanning = 0;
-		wpa_supplicant_notify_scanning(wpa_s, 0);
 
 		/* If we timed out, start a new sched scan to continue
 		 * searching for more SSIDs */

@@ -247,11 +247,8 @@ wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
 	if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_USER_SPACE_MLME)
 		return -EOPNOTSUPP;
 
-	wpa_supplicant_notify_scanning(wpa_s, 1);
 	ret = wpa_drv_sched_scan(wpa_s, params, interval * 1000);
-	if (ret)
-		wpa_supplicant_notify_scanning(wpa_s, 0);
-	else
+	if (!ret)
 		wpa_s->sched_scanning = 1;
 
 	return ret;
@@ -627,7 +624,6 @@ int wpa_supplicant_delayed_sched_scan(struct wpa_supplicant *wpa_s,
 int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 {
 	struct wpa_driver_scan_params params;
-	enum wpa_states prev_state;
 	struct wpa_ssid *ssid;
 	struct wpabuf *wps_ie = NULL;
 	int ret;
@@ -651,11 +647,6 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	/* if we can't allocate space for the filters, we just don't filter */
 	params.filter_ssids = os_zalloc(wpa_s->max_match_sets *
 					sizeof(struct wpa_driver_scan_filter));
-
-	prev_state = wpa_s->wpa_state;
-	if (wpa_s->wpa_state == WPA_DISCONNECTED ||
-	    wpa_s->wpa_state == WPA_INACTIVE)
-		wpa_supplicant_set_state(wpa_s, WPA_SCANNING);
 
 	/* Find the starting point from which to continue scanning */
 	ssid = wpa_s->conf->ssid;
@@ -732,12 +723,9 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	wpabuf_free(wps_ie);
 	os_free(params.filter_ssids);
 
-	if (ret) {
-		wpa_msg(wpa_s, MSG_WARNING, "Failed to initiate sched scan");
-		if (prev_state != wpa_s->wpa_state)
-			wpa_supplicant_set_state(wpa_s, prev_state);
+	if (ret)
 		return ret;
-	}
+
 
 	/* If we have more SSIDs to scan, add a timeout so we scan them too */
 	if (ssid || !wpa_s->first_sched_scan) {
