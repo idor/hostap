@@ -1545,12 +1545,14 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 				wpas_notify_network_enabled_changed(
 					wpa_s, other_ssid);
 		}
-		if (wpa_s->reassociate)
+		if (wpa_s->reassociate) {
+			wpa_supplicant_req_sched_scan(wpa_s);
 #ifdef ANDROID
 			wpa_supplicant_req_scan(wpa_s, 2, 0);
 #else /* ANDROID */
 			wpa_supplicant_req_scan(wpa_s, 0, 0);
 #endif /* ANDROID */
+		}
 	} else if (ssid->disabled && ssid->disabled != 2) {
 		if (wpa_s->current_ssid == NULL) {
 			/*
@@ -1558,6 +1560,7 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 			 * configuration and a new network was made available.
 			 */
 			wpa_s->reassociate = 1;
+			wpa_supplicant_req_sched_scan(wpa_s);
 #ifdef ANDROID
 			wpa_supplicant_req_scan(wpa_s, 2, 0);
 #else /* ANDROID */
@@ -1617,6 +1620,8 @@ void wpa_supplicant_disable_network(struct wpa_supplicant *wpa_s,
 		if (was_disabled != ssid->disabled)
 			wpas_notify_network_enabled_changed(wpa_s, ssid);
 	}
+
+	wpa_supplicant_req_sched_scan(wpa_s);
 }
 
 
