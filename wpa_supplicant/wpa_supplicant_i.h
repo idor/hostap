@@ -380,10 +380,8 @@ struct wpa_supplicant {
 #define WILDCARD_SSID_SCAN ((struct wpa_ssid *) 1)
 
 	struct wpa_ssid *prev_sched_ssid; /* last SSID used in sched scan */
-	int sched_scan_timeout;
 	int sched_scan_interval;
-	int first_sched_scan;
-	int sched_scan_timed_out;
+	int override_sched_scan;
 
 	void (*scan_res_handler)(struct wpa_supplicant *wpa_s,
 				 struct wpa_scan_results *scan_res);

@@ -2094,9 +2094,11 @@ static struct wpa_supplicant * wpa_supplicant_alloc(void)
 		return NULL;
 	wpa_s->scan_req = 1;
 	wpa_s->scan_interval = 5;
+	wpa_s->sched_scan_interval = 3;
 	wpa_s->new_connection = 1;
 	wpa_s->parent = wpa_s;
 	wpa_s->sched_scanning = 0;
+	wpa_s->override_sched_scan = 0;
 
 	return wpa_s;
 }

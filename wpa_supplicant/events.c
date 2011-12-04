@@ -1353,6 +1353,8 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		/* Timeout for receiving the first EAPOL packet */
 		wpa_supplicant_req_auth_timeout(wpa_s, 10, 0);
 	}
+
+	wpa_supplicant_cancel_sched_scan(wpa_s);
 	wpa_supplicant_cancel_scan(wpa_s);
 
 	if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_4WAY_HANDSHAKE) &&
@@ -2280,11 +2282,11 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		break;
 	case EVENT_SCHED_SCAN_STOPPED:
 		wpa_s->sched_scanning = 0;
-
-		/* If we timed out, start a new sched scan to continue
-		 * searching for more SSIDs */
-		if (wpa_s->sched_scan_timed_out)
-			wpa_supplicant_req_sched_scan(wpa_s);
+		if (wpa_s->override_sched_scan) {
+			if (wpa_supplicant_req_sched_scan(wpa_s))
+				wpa_supplicant_req_new_scan(wpa_s,
+						    wpa_s->scan_interval, 0);
+		}
 		break;
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);

@@ -226,17 +226,6 @@ wpa_supplicant_delayed_sched_scan_timeout(void *eloop_ctx, void *timeout_ctx)
 		wpa_supplicant_req_scan(wpa_s, 0, 0);
 }
 
-static void
-wpa_supplicant_sched_scan_timeout(void *eloop_ctx, void *timeout_ctx)
-{
-	struct wpa_supplicant *wpa_s = eloop_ctx;
-
-	wpa_dbg(wpa_s, MSG_DEBUG, "Sched scan timeout - stopping it");
-
-	wpa_s->sched_scan_timed_out = 1;
-	wpa_supplicant_cancel_sched_scan(wpa_s);
-}
-
 static int
 wpa_supplicant_start_sched_scan(struct wpa_supplicant *wpa_s,
 				struct wpa_driver_scan_params *params,
@@ -637,9 +626,9 @@ int wpa_supplicant_delayed_sched_scan(struct wpa_supplicant *wpa_s,
 int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 {
 	struct wpa_driver_scan_params params;
-	struct wpa_ssid *ssid;
+	struct wpa_ssid *ssid = NULL;
 	struct wpabuf *wps_ie = NULL;
-	int ret;
+	int ret, prio;
 	int max_sched_scan_ssids;
 
 	if (!wpa_s->sched_scan_supported)
@@ -653,8 +642,12 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 
 	if (wpa_s->sched_scanning) {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Cancel previous sched scan");
+		wpa_s->override_sched_scan = 1;
 		wpa_supplicant_cancel_sched_scan(wpa_s);
+		return 0;
 	}
+
+	wpa_s->override_sched_scan = 0;
 
 	if (!wpa_supplicant_enabled_networks(wpa_s->conf))
 		return 0;
@@ -666,69 +659,51 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 
 	os_memset(&params, 0, sizeof(params));
 
-	/* if we can't allocate space for the filters, we just don't filter */
 	params.filter_ssids = os_zalloc(wpa_s->max_match_sets *
 					sizeof(struct wpa_driver_scan_filter));
 
-	/* Find the starting point from which to continue scanning */
-	ssid = wpa_s->conf->ssid;
-	if (wpa_s->prev_sched_ssid) {
+	/* Don't sched scan if we can't filter because this will
+	 * wake up the host too frequently during suspend */
+	if (!params.filter_ssids)
+		return -ENOMEM;
+
+	for (prio = 0; prio < wpa_s->conf->num_prio; prio++) {
+		ssid = wpa_s->conf->pssid[prio];
 		while (ssid) {
-			if (ssid == wpa_s->prev_sched_ssid) {
-				ssid = ssid->next;
-				break;
+			if (ssid->disabled) {
+				ssid = ssid->pnext;
+				continue;
 			}
-			ssid = ssid->next;
-		}
-	}
 
-	if (!ssid || !wpa_s->prev_sched_ssid) {
-		wpa_dbg(wpa_s, MSG_DEBUG, "Beginning of SSID list");
+			if ((params.num_filter_ssids >= wpa_s->max_match_sets) ||
+			    (params.num_ssids >= max_sched_scan_ssids))
+				goto start_scan;
 
-		wpa_s->sched_scan_interval = 2;
-		wpa_s->sched_scan_timeout = max_sched_scan_ssids * 2;
-		wpa_s->first_sched_scan = 1;
-		ssid = wpa_s->conf->ssid;
-		wpa_s->prev_sched_ssid = ssid;
-	}
-
-	while (ssid) {
-		if (ssid->disabled) {
-			wpa_s->prev_sched_ssid = ssid;
-			ssid = ssid->next;
-			continue;
-		}
-
-		if (params.filter_ssids && ssid->ssid && ssid->ssid_len) {
-			wpa_dbg(wpa_s, MSG_DEBUG, "add to filter ssid: %s",
-				wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
-			os_memcpy(params.filter_ssids[params.num_filter_ssids].ssid,
-				  ssid->ssid, ssid->ssid_len);
-			params.filter_ssids[params.num_filter_ssids].ssid_len =
-				ssid->ssid_len;
-			params.num_filter_ssids++;
-		}
-
-		if (ssid->scan_ssid) {
-			wpa_dbg(wpa_s, MSG_DEBUG, "add to active scan ssid: %s",
-				wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
-			params.ssids[params.num_ssids].ssid =
-				ssid->ssid;
-			params.ssids[params.num_ssids].ssid_len =
-				ssid->ssid_len;
-			params.num_ssids++;
-			if (params.num_ssids >= max_sched_scan_ssids) {
-				wpa_s->prev_sched_ssid = ssid;
-				break;
+			if (params.filter_ssids && ssid->ssid && ssid->ssid_len) {
+				wpa_dbg(wpa_s, MSG_DEBUG, "add to filter ssid: %s",
+					wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
+				os_memcpy(params.filter_ssids[params.num_filter_ssids].ssid,
+					  ssid->ssid, ssid->ssid_len);
+				params.filter_ssids[params.num_filter_ssids].ssid_len =
+					ssid->ssid_len;
+				params.num_filter_ssids++;
 			}
-		}
 
-		if (params.num_filter_ssids >= wpa_s->max_match_sets)
-			break;
-		wpa_s->prev_sched_ssid = ssid;
-		ssid = ssid->next;
+			if (ssid->scan_ssid) {
+				wpa_dbg(wpa_s, MSG_DEBUG, "add to active scan ssid: %s",
+					wpa_ssid_txt(ssid->ssid, ssid->ssid_len));
+				params.ssids[params.num_ssids].ssid =
+					ssid->ssid;
+				params.ssids[params.num_ssids].ssid_len =
+					ssid->ssid_len;
+				params.num_ssids++;
+			}
+			ssid = ssid->pnext;
+
+		}
 	}
 
+start_scan:
 	/* In case no SSIDs for active scan add wildcard SSID to trigger
 	   broadcast probe request */
 	if (!params.num_ssids)
@@ -737,26 +712,25 @@ int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s)
 	if (wpa_s->wps)
 		wps_ie = wpa_supplicant_extra_ies(wpa_s, &params);
 
-	wpa_dbg(wpa_s, MSG_DEBUG, "Starting sched scan: interval %d timeout %d",
-		wpa_s->sched_scan_interval, wpa_s->sched_scan_timeout);
+	wpa_dbg(wpa_s, MSG_DEBUG, "Starting sched scan: interval %d",
+		wpa_s->sched_scan_interval);
 
 	ret = wpa_supplicant_start_sched_scan(wpa_s, &params,
 					      wpa_s->sched_scan_interval);
 	wpabuf_free(wps_ie);
-	os_free(params.filter_ssids);
+	if (params.filter_ssids)
+		os_free(params.filter_ssids);
 
-	if (ret)
+	if (ret) {
+		wpa_dbg(wpa_s, MSG_WARNING,
+			"Failed to start sched scan (%d)", ret);
 		return ret;
+	}
 
-	/* If we have more SSIDs to scan, add a timeout so we scan them too */
-	if (ssid || !wpa_s->first_sched_scan) {
-		wpa_s->sched_scan_timed_out = 0;
-		eloop_register_timeout(wpa_s->sched_scan_timeout, 0,
-				       wpa_supplicant_sched_scan_timeout,
-				       wpa_s, NULL);
-		wpa_s->first_sched_scan = 0;
-		wpa_s->sched_scan_timeout /= 2;
-		wpa_s->sched_scan_interval *= 2;
+	if (prio < wpa_s->conf->num_prio) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Too many networks for sched scan");
+		return -EBUSY;
 	}
 
 	return 0;
@@ -786,11 +760,13 @@ void wpa_supplicant_cancel_scan(struct wpa_supplicant *wpa_s)
  */
 void wpa_supplicant_cancel_sched_scan(struct wpa_supplicant *wpa_s)
 {
-	if (!wpa_s->sched_scanning)
+	if (!wpa_s->sched_scanning) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"cancel_sched_scan called when no sched scan");
 		return;
+	}
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "Cancelling sched scan");
-	eloop_cancel_timeout(wpa_supplicant_sched_scan_timeout, wpa_s, NULL);
 	wpa_supplicant_stop_sched_scan(wpa_s);
 }
 
