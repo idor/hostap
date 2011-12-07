@@ -16,19 +16,33 @@
 #
 
 LOCAL_PATH := $(call my-dir)
+PKG_CONFIG ?= pkg-config
 
 WPA_BUILD_SUPPLICANT := false
-ifneq ($(TARGET_SIMULATOR),true)
-  ifneq ($(BOARD_WPA_SUPPLICANT_DRIVER),)
-    WPA_BUILD_SUPPLICANT := true
-    CONFIG_DRIVER_$(BOARD_WPA_SUPPLICANT_DRIVER) := y
-  endif
+ifneq ($(BOARD_WPA_SUPPLICANT_DRIVER),)
+  WPA_BUILD_SUPPLICANT := true
+  CONFIG_DRIVER_$(BOARD_WPA_SUPPLICANT_DRIVER) := y
 endif
 
-include $(LOCAL_PATH)/config-android
+ifeq ($(WPA_BUILD_SUPPLICANT),true)
+
+include $(LOCAL_PATH)/.config
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
+
+# Set Android log name
+L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
+
+ifdef CONFIG_DRIVER_NL80211
+ifneq ($(BOARD_WLAN_DEVICE), wl12xx_mac80211)
+  L_CFLAGS += -DANDROID_BRCM_P2P_PATCH
+endif
+endif
+
+ifdef CONFIG_ROAMING
+L_CFLAGS += -DCONFIG_ROAMING
+endif
 
 # Use Android specific directory for control interface sockets
 L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
@@ -64,7 +78,7 @@ INCLUDES += $(LOCAL_PATH)/src/wps
 INCLUDES += external/openssl/include
 INCLUDES += frameworks/base/cmds/keystore
 ifdef CONFIG_DRIVER_NL80211
-INCLUDES += external/libnl/include
+INCLUDES += external/libnl-headers
 endif
 
 OBJS = config.c
@@ -1043,7 +1057,9 @@ ifdef NEED_FIPS186_2_PRF
 SHA1OBJS += src/crypto/fips_prf_internal.c
 endif
 endif
-ifndef CONFIG_NO_WPA_PASSPHRASE
+ifdef CONFIG_NO_WPA_PASSPHRASE
+L_CFLAGS += -DCONFIG_NO_PBKDF2
+else
 SHA1OBJS += src/crypto/sha1-pbkdf2.c
 endif
 ifdef NEED_T_PRF
@@ -1143,12 +1159,12 @@ DBUS_OBJS += dbus/dbus_old_handlers_wps.c
 endif
 DBUS_OBJS += dbus/dbus_dict_helpers.c
 ifndef DBUS_LIBS
-DBUS_LIBS := $(shell pkg-config --libs dbus-1)
+DBUS_LIBS := $(shell $(PKG_CONFIG) --libs dbus-1)
 endif
 ifndef DBUS_INCLUDE
-DBUS_INCLUDE := $(shell pkg-config --cflags dbus-1)
+DBUS_INCLUDE := $(shell $(PKG_CONFIG) --cflags dbus-1)
 endif
-dbus_version=$(subst ., ,$(shell pkg-config --modversion dbus-1))
+dbus_version=$(subst ., ,$(shell $(PKG_CONFIG) --modversion dbus-1))
 DBUS_VERSION_MAJOR=$(word 1,$(dbus_version))
 DBUS_VERSION_MINOR=$(word 2,$(dbus_version))
 ifeq ($(DBUS_VERSION_MAJOR),)
@@ -1171,11 +1187,14 @@ DBUS_OBJS += dbus/dbus_new.c dbus/dbus_new_handlers.c
 ifdef CONFIG_WPS
 DBUS_OBJS += dbus/dbus_new_handlers_wps.c
 endif
+ifdef CONFIG_P2P
+DBUS_OBJS += dbus/dbus_new_handlers_p2p.c
+endif
 ifndef DBUS_LIBS
-DBUS_LIBS := $(shell pkg-config --libs dbus-1)
+DBUS_LIBS := $(shell $(PKG_CONFIG) --libs dbus-1)
 endif
 ifndef DBUS_INCLUDE
-DBUS_INCLUDE := $(shell pkg-config --cflags dbus-1)
+DBUS_INCLUDE := $(shell $(PKG_CONFIG) --cflags dbus-1)
 endif
 ifdef CONFIG_CTRL_IFACE_DBUS_INTRO
 DBUS_OBJS += dbus/dbus_new_introspect.c
@@ -1260,6 +1279,9 @@ endif
 
 ifdef CONFIG_DEBUG_SYSLOG
 L_CFLAGS += -DCONFIG_DEBUG_SYSLOG
+ifdef CONFIG_DEBUG_SYSLOG_FACILITY
+L_CFLAGS += -DLOG_HOSTAPD="$(CONFIG_DEBUG_SYSLOG_FACILITY)"
+endif
 endif
 
 ifdef CONFIG_DEBUG_FILE
@@ -1363,8 +1385,6 @@ ifndef LDO
 LDO=$(CC)
 endif
 
-ifeq ($(WPA_BUILD_SUPPLICANT),true)
-
 ########################
 
 include $(CLEAR_VARS)
@@ -1379,13 +1399,19 @@ include $(BUILD_EXECUTABLE)
 ########################
 include $(CLEAR_VARS)
 LOCAL_MODULE := wpa_supplicant
+ifdef CONFIG_DRIVER_CUSTOM
+LOCAL_STATIC_LIBRARIES := libCustomWifi
+endif
+ifneq ($(BOARD_WPA_SUPPLICANT_PRIVATE_LIB),)
+LOCAL_STATIC_LIBRARIES += $(BOARD_WPA_SUPPLICANT_PRIVATE_LIB)
+endif
 LOCAL_SHARED_LIBRARIES := libc libcutils libcrypto libssl
 ifdef CONFIG_DRIVER_NL80211
-LOCAL_SHARED_LIBRARIES += libnl
+LOCAL_STATIC_LIBRARIES += libnl_2
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
-LOCAL_C_INCLUDES := bionic/libc/kernel/common $(INCLUDES)
+LOCAL_C_INCLUDES := $(INCLUDES)
 include $(BUILD_EXECUTABLE)
 
 ########################

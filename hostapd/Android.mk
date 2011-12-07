@@ -1,20 +1,34 @@
 LOCAL_PATH := $(call my-dir)
 
-WPA_BUILD_HOSTAPD := true
-ifneq ($(TARGET_SIMULATOR),true)
-  ifneq ($(BOARD_HOSTAPD_DRIVER),)
-    WPA_BUILD_HOSTAPD := true
-    CONFIG_DRIVER_$(BOARD_HOSTAPD_DRIVER) := y
-  endif
+WPA_BUILD_HOSTAPD := false
+ifneq ($(BOARD_HOSTAPD_DRIVER),)
+  WPA_BUILD_HOSTAPD := true
+  CONFIG_DRIVER_$(BOARD_HOSTAPD_DRIVER) := y
 endif
 
-include $(LOCAL_PATH)/config-android
+ifeq ($(WPA_BUILD_HOSTAPD),true)
+
+include $(LOCAL_PATH)/.config
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
 
+# Set Android log name
+L_CFLAGS += -DANDROID_LOG_NAME=\"hostapd\"
+
+ifdef CONFIG_DRIVER_NL80211
+ifneq ($(BOARD_WLAN_DEVICE), wl12xx_mac80211)
+  L_CFLAGS += -DANDROID_BRCM_P2P_PATCH
+endif
+endif
+
 # Use Android specific directory for control interface sockets
 L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
+L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/system/wpa_supplicant\"
+
+# Use Android specific directory for control interface sockets
+L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
+L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/system/wpa_supplicant\"
 
 # To force sizeof(enum) = 4
 ifeq ($(TARGET_ARCH),arm)
@@ -33,7 +47,7 @@ INCLUDES += $(LOCAL_PATH)/src/utils
 INCLUDES += external/openssl/include
 INCLUDES += frameworks/base/cmds/keystore
 ifdef CONFIG_DRIVER_NL80211
-INCLUDES += external/libnl/include
+INCLUDES += external/libnl-headers
 endif
 
 
@@ -784,8 +798,6 @@ OBJS_c += src/utils/trace.c
 OBJS_c += src/utils/wpa_debug.c
 endif
 
-ifeq ($(WPA_BUILD_HOSTAPD),true)
-
 ########################
 
 include $(CLEAR_VARS)
@@ -799,7 +811,7 @@ include $(BUILD_EXECUTABLE)
 
 ########################
 include $(CLEAR_VARS)
-LOCAL_MODULE := hostapd_bin
+LOCAL_MODULE := hostapd
 LOCAL_MODULE_TAGS := optional
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
@@ -809,14 +821,11 @@ LOCAL_STATIC_LIBRARIES += $(BOARD_HOSTAPD_PRIVATE_LIB)
 endif
 LOCAL_SHARED_LIBRARIES := libc libcutils libcrypto libssl
 ifdef CONFIG_DRIVER_NL80211
-LOCAL_SHARED_LIBRARIES += libnl
+LOCAL_STATIC_LIBRARIES += libnl_2
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)
 LOCAL_C_INCLUDES := $(INCLUDES)
 include $(BUILD_EXECUTABLE)
-
-
-include $(LOCAL_PATH)/deconfig-android
 
 endif # ifeq ($(WPA_BUILD_HOSTAPD),true)
