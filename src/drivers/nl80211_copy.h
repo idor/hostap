@@ -1408,6 +1408,7 @@ enum nl80211_iftype {
  * @NL80211_STA_FLAG_MFP: station uses management frame protection
  * @NL80211_STA_FLAG_AUTHENTICATED: station is authenticated
  * @NL80211_STA_FLAG_MAX: highest station flag number currently defined
+ * @NL80211_STA_FLAG_PRE_ASSOC: station is pre-associated
  * @__NL80211_STA_FLAG_AFTER_LAST: internal use
  */
 enum nl80211_sta_flags {
@@ -1417,6 +1418,8 @@ enum nl80211_sta_flags {
 	NL80211_STA_FLAG_WME,
 	NL80211_STA_FLAG_MFP,
 	NL80211_STA_FLAG_AUTHENTICATED,
+	NL80211_STA_FLAG_TDLS_PEER,
+	NL80211_STA_FLAG_PRE_ASSOC,
 
 	/* keep last */
 	__NL80211_STA_FLAG_AFTER_LAST,
