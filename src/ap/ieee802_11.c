@@ -1797,6 +1797,25 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 
 	ieee802_1x_notify_port_enabled(sta->eapol_sm, 1);
 
+	if (hapd->pending_eapol_rx) {
+		struct os_time now, age;
+		os_get_time(&now);
+		os_time_sub(&now, &hapd->pending_eapol_rx_time, &age);
+		if (age.sec == 0 && /*age.usec < 100000 &&*/
+		    os_memcmp(hapd->pending_eapol_rx_src,
+			      mgmt->da, ETH_ALEN) == 0) {
+			wpa_printf(MSG_DEBUG, "Process pending EAPOL "
+				"frame that was received just before "
+				"association notification");
+			ieee802_1x_receive(
+				hapd, hapd->pending_eapol_rx_src,
+				wpabuf_head(hapd->pending_eapol_rx),
+				wpabuf_len(hapd->pending_eapol_rx));
+		 }
+		 wpabuf_free(hapd->pending_eapol_rx);
+		 hapd->pending_eapol_rx = NULL;
+	 }
+
  fail:
 	/* Copy of the association request is not needed anymore */
 	if (sta->last_assoc_req) {

@@ -120,6 +120,11 @@ struct hostapd_data {
 
 	struct wpabuf *wps_beacon_ie;
 	struct wpabuf *wps_probe_resp_ie;
+
+	struct wpabuf *pending_eapol_rx;
+	struct os_time pending_eapol_rx_time;
+	u8 pending_eapol_rx_src[ETH_ALEN];
+
 #ifdef CONFIG_WPS
 	unsigned int ap_pin_failures;
 	struct upnp_wps_device_sm *wps_upnp;

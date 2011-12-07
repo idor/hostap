@@ -253,6 +253,9 @@ static void hostapd_cleanup(struct hostapd_data *hapd)
 	os_free(hapd->probereq_cb);
 	hapd->probereq_cb = NULL;
 
+	wpabuf_free(hapd->pending_eapol_rx);
+	hapd->pending_eapol_rx = NULL;
+
 #ifdef CONFIG_P2P
 	wpabuf_free(hapd->p2p_beacon_ie);
 	hapd->p2p_beacon_ie = NULL;

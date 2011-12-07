@@ -725,6 +725,17 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 	if (!sta || !(sta->flags & (WLAN_STA_ASSOC | WLAN_STA_PREAUTH))) {
 		wpa_printf(MSG_DEBUG, "IEEE 802.1X data frame from not "
 			   "associated/Pre-authenticating STA");
+		if (sta->flags & WLAN_STA_ASSOC_REQ_OK) {
+			wpa_printf(MSG_DEBUG, "Saving EAPOL for later use");
+			wpabuf_free(hapd->pending_eapol_rx);
+			hapd->pending_eapol_rx = wpabuf_alloc_copy(buf, len);
+			if (hapd->pending_eapol_rx) {
+				os_get_time(&hapd->pending_eapol_rx_time);
+				os_memcpy(hapd->pending_eapol_rx_src, sa,
+					  ETH_ALEN);
+			}
+		}
+
 		return;
 	}
 
