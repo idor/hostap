@@ -7185,8 +7185,33 @@ static int nl80211_flush_pmkid(void *priv)
 }
 
 #ifdef ANDROID
+/* we start with "auto" power mode - power_save is on */
+static int g_power_mode = 0;
+
+static int nl80211_set_power_save(struct wpa_driver_nl80211_data *drv,
+			      enum nl80211_ps_state ps_state)
+{
+	struct nl_msg *msg;
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	genlmsg_put(msg, 0, 0, genl_family_get_id(drv->nl80211), 0,
+		    0, NL80211_CMD_SET_POWER_SAVE, 0);
+
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, drv->ifindex);
+	NLA_PUT_U32(msg, NL80211_ATTR_PS_STATE, ps_state);
+
+	return send_and_recv_msgs(drv, msg, NULL, NULL);
+ nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+
 static int nl80211_toggle_wowlan_trigger(struct i802_bss *bss, int nr,
-					 int enabled)
+                                         int enabled)
 {
 	if (nr >= NR_RX_FILTERS) {
 		wpa_printf(MSG_ERROR, "Unknown filter: %d\n", nr);
@@ -7274,23 +7299,6 @@ static int nl80211_priv_driver_cmd( void *priv, char *cmd, char *buf, size_t buf
 		ret = snprintf(buf, buf_len, "ScanMode = %u\n", g_scan_type);
 		if (ret < (int)buf_len)
 			return ret;
-	} else if( os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
-		int mode = atoi(cmd + 9);
-
-		if (mode == g_power_mode)
-			ret = 0;
-		else if (mode == 1) /* active mode */
-			ret = wpa_driver_set_power_save(drv->ifname, 0);
-		else if (mode == 0) /* auto mode */
-			ret = wpa_driver_set_power_save(drv->ifname, 1);
-
-		if (!ret)
-			g_power_mode = mode;
-
-		wpa_printf(MSG_DEBUG, "global POWERMODE set to %d (wanted %d), ret %d",
-			   g_power_mode, mode, ret);
-	} else if( os_strcasecmp(cmd, "GETPOWER") == 0 ) {
-		ret = sprintf(buf, "powermode = %u\n", g_power_mode);
 	} else if( os_strncasecmp(cmd, "BTCOEXMODE", 10) == 0 ) {
 		int mode = atoi(cmd + 10);
 
@@ -7305,6 +7313,23 @@ static int nl80211_priv_driver_cmd( void *priv, char *cmd, char *buf, size_t buf
 			ret = -1;
 		}
 #endif
+	} else if( os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
+		int mode = atoi(cmd + 9);
+
+		if (mode == g_power_mode)
+			ret = 0;
+		else if (mode == 1) /* active mode */
+			ret = nl80211_set_power_save(drv, NL80211_PS_DISABLED);
+		else if (mode == 0) /* auto mode */
+			ret = nl80211_set_power_save(drv, NL80211_PS_ENABLED);
+
+		if (!ret)
+			g_power_mode = mode;
+
+		wpa_printf(MSG_DEBUG, "global POWERMODE set to %d (wanted %d), ret %d",
+			   g_power_mode, mode, ret);
+	} else if( os_strcasecmp(cmd, "GETPOWER") == 0 ) {
+		ret = sprintf(buf, "powermode = %u\n", g_power_mode);
 	} else if( os_strncasecmp(cmd, "RXFILTER-ADD ", 13) == 0 ) {
 		int i = nl80211_parse_wowlan_trigger_nr(cmd + 13);
 		if(i < 0)
