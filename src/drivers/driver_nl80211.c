@@ -43,9 +43,12 @@
 #if defined(ANDROID_BRCM_P2P_PATCH) && !defined(HOSTAPD)
 #include "wpa_supplicant_i.h"
 #endif
+
 #ifdef ANDROID
 #define WPA_EVENT_DRIVER_STATE		"CTRL-EVENT-DRIVER-STATE "
-#endif
+#include "common/wpa_ctrl.h"
+#endif /* ANDROID */
+
 #ifdef CONFIG_LIBNL20
 /* libnl 2.0 compatibility code */
 #define nl_handle nl_sock
@@ -7002,7 +7005,6 @@ static const char * nl80211_get_radio_name(void *priv)
 	return drv->phyname;
 }
 
-
 static int nl80211_pmkid(struct i802_bss *bss, int cmd, const u8 *bssid,
 			 const u8 *pmkid)
 {
@@ -7051,6 +7053,114 @@ static int nl80211_flush_pmkid(void *priv)
 	return nl80211_pmkid(bss, NL80211_CMD_FLUSH_PMKSA, NULL, NULL);
 }
 
+#ifdef ANDROID
+static int nl80211_toggle_rx_filter(char state)
+{
+	return 0; /* not implemented yet */
+}
+
+
+static int nl80211_priv_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len )
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	int ret = 0, flags;
+
+	wpa_printf(MSG_DEBUG, "%s %s len = %d", __func__, cmd, buf_len);
+
+	if (os_strcasecmp(cmd, "STOP") == 0) {
+		linux_set_iface_flags(drv->ioctl_sock, bss->ifname, 0);
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STOPPED");
+	} else if (os_strcasecmp(cmd, "START") == 0) {
+		linux_set_iface_flags(drv->ioctl_sock, bss->ifname, 1);
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STARTED");
+	} else if (os_strcasecmp(cmd, "MACADDR") == 0) {
+		u8 macaddr[ETH_ALEN] = {};
+
+		ret = linux_get_ifhwaddr(drv->ioctl_sock, bss->ifname, macaddr);
+		if (!ret)
+			ret = os_snprintf(buf, buf_len,
+					"Macaddr = " MACSTR "\n", MAC2STR(macaddr));
+	} else if ((os_strcasecmp(cmd, "RSSI") == 0) || (os_strcasecmp(cmd, "RSSI-APPROX") == 0)) {
+		struct wpa_signal_info sig;
+		int rssi;
+
+		if (!drv->associated)
+			return -1;
+
+		ret = nl80211_get_link_signal(drv, &sig);
+		if (ret == 0) {
+			rssi = sig.current_signal;
+			ret = os_snprintf(buf, buf_len, "%s rssi %d\n", drv->ssid, rssi);
+		}
+	} else if (os_strcasecmp(cmd, "LINKSPEED") == 0) {
+		struct wpa_signal_info sig;
+		int linkspeed;
+
+		if (!drv->associated)
+			return -1;
+
+		ret = nl80211_get_link_signal(drv, &sig);
+		if (ret == 0) {
+			linkspeed = sig.current_txrate;
+			ret = os_snprintf(buf, buf_len, "LinkSpeed %d\n", linkspeed);
+		}
+	} else if( os_strcasecmp(cmd, "RELOAD") == 0 ) {
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+#if 0 /* Not implemented yet */
+	} else if( os_strcasecmp(cmd, "SCAN-PASSIVE") == 0 ) {
+		g_scan_type = IW_SCAN_TYPE_PASSIVE;
+		ret = 0;
+	} else if( os_strcasecmp(cmd, "SCAN-ACTIVE") == 0 ) {
+		g_scan_type = IW_SCAN_TYPE_ACTIVE;
+		ret = 0;
+	} else if( os_strcasecmp(cmd, "SCAN-MODE") == 0 ) {
+		ret = snprintf(buf, buf_len, "ScanMode = %u\n", g_scan_type);
+		if (ret < (int)buf_len)
+			return ret;
+	} else if( os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
+		int mode = atoi(cmd + 9);
+
+		if (mode == g_power_mode)
+			ret = 0;
+		else if (mode == 1) /* active mode */
+			ret = wpa_driver_set_power_save(drv->ifname, 0);
+		else if (mode == 0) /* auto mode */
+			ret = wpa_driver_set_power_save(drv->ifname, 1);
+
+		if (!ret)
+			g_power_mode = mode;
+
+		wpa_printf(MSG_DEBUG, "global POWERMODE set to %d (wanted %d), ret %d",
+			   g_power_mode, mode, ret);
+	} else if( os_strcasecmp(cmd, "GETPOWER") == 0 ) {
+		ret = sprintf(buf, "powermode = %u\n", g_power_mode);
+	} else if( os_strncasecmp(cmd, "BTCOEXMODE", 10) == 0 ) {
+		int mode = atoi(cmd + 10);
+
+		wpa_printf(MSG_DEBUG, "will change btcoex mode to: %d", mode);
+
+		if (mode == 1) { /* disable BT-coex */
+			ret = wpa_driver_toggle_btcoex_state('0');
+		} else if (mode == 2) { /* enable BT-coex */
+			ret = wpa_driver_toggle_btcoex_state('1');
+		} else {
+			wpa_printf(MSG_DEBUG, "invalid btcoex mode: %d", mode);
+			ret = -1;
+		}
+#endif
+	} else if( os_strcasecmp(cmd, "RXFILTER-START") == 0 ) {
+		ret = nl80211_toggle_rx_filter('1');
+	} else if( os_strcasecmp(cmd, "RXFILTER-STOP") == 0 ) {
+		ret = nl80211_toggle_rx_filter('0');
+	} else {
+		wpa_printf(MSG_ERROR, "Unsupported command: %s", cmd);
+		ret = -1;
+	}
+
+	return ret;
+}
+#endif /* ANDROID */
 
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",
@@ -7133,6 +7243,6 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.set_ap_wps_ie = wpa_driver_set_ap_wps_p2p_ie,
 #endif
 #ifdef ANDROID
-	.driver_cmd = wpa_driver_nl80211_driver_cmd,
-#endif
+	.driver_cmd = nl80211_priv_driver_cmd,
+#endif /* ANDROID */
 };
