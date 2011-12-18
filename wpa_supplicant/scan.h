@@ -21,7 +21,7 @@ int wpa_supplicant_delayed_sched_scan(struct wpa_supplicant *wpa_s,
 				      int sec, int usec);
 int wpa_supplicant_req_sched_scan(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_cancel_scan(struct wpa_supplicant *wpa_s);
-void wpa_supplicant_cancel_sched_scan(struct wpa_supplicant *wpa_s);
+int wpa_supplicant_cancel_sched_scan(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_notify_scanning(struct wpa_supplicant *wpa_s,
 				    int scanning);
 struct wpa_driver_scan_params;
