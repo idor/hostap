@@ -26,6 +26,11 @@ enum {
 
 #ifdef CONFIG_ANDROID_LOG
 
+void android_printf(int level, char *format, ...)
+PRINTF_FORMAT(2, 3);
+
+#define wpa_printf android_printf
+
 #define wpa_debug_print_timestamp() do {} while (0)
 #define wpa_hexdump(...)            do {} while (0)
 #define wpa_hexdump_key(...)        do {} while (0)
@@ -35,18 +40,12 @@ enum {
 #define wpa_hexdump_ascii_key(...)  do {} while (0)
 #define wpa_debug_open_file(...)    do {} while (0)
 #define wpa_debug_close_file()      do {} while (0)
-#define wpa_dbg(...)                do {} while (0)
+#define wpa_dbg(wpas, args...)      android_printf(args)
 
 static inline int wpa_debug_reopen_file(void)
 {
 	return 0;
 }
-
-
-void android_printf(int level, char *format, ...)
-PRINTF_FORMAT(2, 3);
-
-#define wpa_printf android_printf
 
 #else /* CONFIG_ANDROID_LOG */
 
