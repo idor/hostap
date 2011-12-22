@@ -714,8 +714,6 @@ struct wpa_bss_params {
 #define WPA_STA_WMM BIT(1)
 #define WPA_STA_SHORT_PREAMBLE BIT(2)
 #define WPA_STA_MFP BIT(3)
-#define WPA_STA_TDLS_PEER BIT(4)
-#define WPA_STA_PRE_ASSOC BIT(5)
 
 /**
  * struct p2p_params - P2P parameters for driver-based P2P management

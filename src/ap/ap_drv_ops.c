@@ -37,9 +37,6 @@ u32 hostapd_sta_flags_to_drv(u32 flags)
 		res |= WPA_STA_SHORT_PREAMBLE;
 	if (flags & WLAN_STA_MFP)
 		res |= WPA_STA_MFP;
-	if ((flags & (WLAN_STA_ASSOC_REQ_OK | WLAN_STA_ASSOC)) ==
-	     WLAN_STA_ASSOC_REQ_OK)
-		res |= WPA_STA_PRE_ASSOC;
 	return res;
 }
 
@@ -180,8 +177,7 @@ int hostapd_set_sta_flags(struct hostapd_data *hapd, struct sta_info *sta)
 {
 	int set_flags, total_flags, flags_and, flags_or;
 	total_flags = hostapd_sta_flags_to_drv(sta->flags);
-	set_flags = WPA_STA_SHORT_PREAMBLE | WPA_STA_WMM | WPA_STA_MFP |
-		    WPA_STA_PRE_ASSOC;
+	set_flags = WPA_STA_SHORT_PREAMBLE | WPA_STA_WMM | WPA_STA_MFP;
 	if (((!hapd->conf->ieee802_1x && !hapd->conf->wpa) ||
 	     sta->auth_alg == WLAN_AUTH_FT) &&
 	    sta->flags & WLAN_STA_AUTHORIZED)
